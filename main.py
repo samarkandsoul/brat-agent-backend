@@ -1,5 +1,4 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
 from app.agents.ds.ds01_market_research import analyze_market, MarketResearchRequest
 
 app = FastAPI()
@@ -10,5 +9,5 @@ def root():
 
 @app.post("/market/analyze")
 def market_analyze(req: MarketResearchRequest):
-    result = analyze_market(req.niche, req.country)
+    result = analyze_market(req)
     return {"status": "success", "data": result}
