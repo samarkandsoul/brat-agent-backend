@@ -3,10 +3,10 @@ from app.agents.ds.ds01_market_research import analyze_market, MarketResearchReq
 
 app = FastAPI()
 
+@app.post("/market/analyze")
+def analyze_market_endpoint(request: MarketResearchRequest):
+    return analyze_market(request)
+
 @app.get("/")
 def root():
-    return {"status": "Brat backend running"}
-
-@app.post("/ds/market-research")
-def run_market_research(request: MarketResearchRequest):
-    return analyze_market(request)
+    return {"status": "OK", "message": "BRAT backend running"}
