@@ -1,29 +1,101 @@
+from app.agents.ds.ds01_market_research import analyze_market, MarketResearchRequest
+from app.agents.ds.ds02_drive_agent import DriveAgent
+
+
 class MSP:
-    def __init__(self):
-        pass
+    """
+    MSP – Master Strategy Processor.
 
-    def process(self, command: str):
-        text = command.lower().strip()
+    Qəbul etdiyi nümunə komandalar:
+      "market: pet hair remover | US"
+      "shopify temasi hazirla"
+      "drive: samarkand soul qovlugu yarat"
+    """
 
-        # 1) Shopify ilə bağlı komanda
-        if "shopify" in text:
-            return "Shopify komandası qəbul edildi. Tezliklə inteqrasiya əlavə olunacaq."
+    def __init__(self) -> None:
+        # Gələcəkdə burada başqa agentlər də saxlayacağıq
+        self.drive_agent = DriveAgent()
 
-        # 2) Google Drive komanda
-        if "drive" in text or "google" in text:
-            return "Google Drive komandası qəbul edildi. Qovluq sistemi üçün modul hazırlanır."
+    def process(self, raw_command: str) -> str:
+        """
+        Telegram-dan gələn MSP komandalarını emal edir.
+        Sadə string qaytarır.
+        """
+        text = (raw_command or "").strip()
+        if not text:
+            return "MSP: Boş komanda alındı."
 
-        # 3) Market analizi komanda
-        if "market" in text or "niş" in text:
-            return "Market Research komandası MSP-ə çatdı. DS-01 moduluna yönləndiriləcək."
+        lower = text.lower()
 
-        # 4) Gündəlik plan / idarəetmə
-        if "plan" in text or "tapşırıq" in text:
-            return "Planlaşdırma və gündəlik idarəetmə komandası qəbul edildi."
+        # =========================
+        #  DS-01: MARKET RESEARCH
+        # =========================
+        # "market: Niche | Country" və ya "market Niche | Country"
+        if lower.startswith("market"):
+            niche = ""
+            country = "US"
 
-        # 5) Agent statusu / sistem
-        if "status" in text or "agent" in text or "sistem" in text:
-            return "Sistem statusu hazırdır. Agentlərin vəziyyəti üçün modul hazırlanırr."
+            if ":" in text:
+                after = text.split(":", 1)[1].strip()
+            else:
+                after = text.split(" ", 1)[1].strip() if " " in text else ""
 
-        # 6) Default cavab — tanımadısa
-        return f"MSP sənin dediyini qəbul etdi, amma komandaya uyğun modul hələ hazır deyil: {command}"
+            if after:
+                parts = [p.strip() for p in after.split("|")]
+                if len(parts) >= 1:
+                    niche = parts[0]
+                if len(parts) >= 2 and parts[1]:
+                    country = parts[1]
+
+            if not niche:
+                return (
+                    "MSP: `market` komandası üçün format belə olmalıdır:\n"
+                    "market: Niche | Country\n"
+                    "Məsələn: market: pet hair remover | US"
+                )
+
+            try:
+                req = MarketResearchRequest(niche=niche, country=country)
+                result = analyze_market(req)
+
+                if isinstance(result, dict) and "error" in result:
+                    return f"DS-01 error: {result}"
+
+                return f"DS-01 Market Research nəticəsi:\n{result}"
+            except Exception as e:
+                return f"MSP: DS-01 çağırılarkən xəta baş verdi: {e!r}"
+
+        # =========================
+        #  SHOPIFY SKELETON
+        # =========================
+        if lower.startswith("shopify"):
+            return (
+                "Shopify komandası qəbul edildi. "
+                "Tezliklə inteqrasiyaya əlavə olunacaq."
+            )
+
+        # =========================
+        #  DS-02: DRIVE AGENT SKELETON
+        # =========================
+        if lower.startswith("drive"):
+            # "drive: ..." və ya "drive ..." formasında ola bilər
+            if ":" in text:
+                payload = text.split(":", 1)[1].strip()
+            else:
+                payload = text.split(" ", 1)[1].strip() if " " in text else ""
+
+            if not payload:
+                return (
+                    "Drive Agent üçün komanda boşdur. Nümunə:\n"
+                    "drive: Samarkand Soul üçün yeni qovluq yarat"
+                )
+
+            try:
+                return self.drive_agent.process(payload)
+            except Exception as e:
+                return f"Drive Agent xətaya düşdü: {e!r}"
+
+        # =========================
+        #  DEFAULT – ECHO
+        # =========================
+        return f"MSP skeleton received: {text}"
