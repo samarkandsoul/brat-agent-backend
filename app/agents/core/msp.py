@@ -1,159 +1,185 @@
-# src/app/agents/core/msp.py
-
 import re
-from typing import Tuple
+from dataclasses import dataclass
+from typing import Optional, Tuple
 
-from app.agents.ds.ds02_drive_agent import DriveAgent
-
-
-# ------------------------
-# Core MSP logic
-# ------------------------
-
-
-def _parse_msp_text(text: str) -> str:
-    """
-    'msp:' prefixini təmizləyib qalan hissəni qaytarır.
-    """
-    if not text:
-        return ""
-
-    # Telegram mesajı: "msp: nəsə nəsə"
-    lowered = text.strip()
-    if lowered.lower().startswith("msp:"):
-        return lowered[4:].strip()
-
-    return lowered.strip()
+# ✅ DİQQƏT:
+# DriveAgent artıq ayrıca fayldadır (ds02_drive_agent.py).
+# Biz onu birbaşa buradan çağırırıq.
+# Fayl yolu: app/agents/ds02_drive_agent.py
+from app.agents.ds02_drive_agent import DriveAgent
 
 
-def _handle_ds01_market(payload: str) -> str:
-    """
-    DS-01 demo cavabı.
-    Gözlənilən format:
-      'market: <Niche> | <Country>'
-    """
+# ==============================
+#  MSP AGENT — CORE LOGIC
+# ==============================
 
-    # nümunə: "market: pet hair remover | US"
-    pattern = r"^market\s*:\s*(.+?)\s*\|\s*(.+)$"
-    m = re.match(pattern, payload.strip(), flags=re.IGNORECASE)
-
-    if not m:
-        return (
-            "DS-01 Market Research formatı yanlışdır.\n"
-            "Düzgün format:\n"
-            "msp: market: Niche | Country\n"
-            "Məsələn:\n"
-            "msp: market: pet hair remover | US"
-        )
-
-    niche, country = m.group(1).strip(), m.group(2).strip()
-
-    return (
-        "DS-01 Market Research nəticəsi:\n"
-        "DS-01 demo rejimindədir.\n"
-        f"Niche: {niche}\n"
-        f"Country: {country}\n\n"
-        "Real market analizi OpenAI balansı aktiv olandan sonra qoşulacaq. "
-        "Hal-hazırda yalnız komanda strukturunu test edirik. 🧠"
-    )
-
-
-def _handle_drive(payload: str) -> str:
-    """
-    Drive qovluq strukturu üçün handler.
-    Gözlənilən format:
-      'drive: <path>'
-    Məsələn:
-      'drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master'
-    """
-    path = payload.strip()
-    if path.lower().startswith("drive:"):
-        path = path[len("drive:") :].strip()
-
-    if not path:
-        return (
-            "Drive komandasının formatı yanlışdır.\n"
-            "Düzgün format:\n"
-            "msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master"
-        )
-
-    try:
-        drive_agent = DriveAgent()
-        result = drive_agent.handle_drive_command(
-            path_str=path,
-            user_email="samarkand.soul.ss@gmail.com",
-        )
-        return result
-    except Exception as e:
-        # Hər halda cavab göndərək ki, bot 'susmasın'
-        return f"Drive Agent xəta verdi: {e}"
-
-
-def _core_handle_msp(text: str) -> str:
-    """
-    Bütün MSP mesajları üçün əsas router.
-    """
-    payload = _parse_msp_text(text)
-
-    # boş mesaj
-    if not payload:
-        return "MSP skeleton received: (boş mesaj)."
-
-    lower_payload = payload.lower()
-
-    # DS-01 Market Research
-    if lower_payload.startswith("market:"):
-        return _handle_ds01_market(payload)
-
-    # Drive komandasI
-    if lower_payload.startswith("drive:"):
-        return _handle_drive(payload)
-
-    # Default skeleton cavabı
-    return f"MSP skeleton received: {payload}"
-
-
-# ------------------------
-# Public entrypoints
-# (router hansı adı çağırsa, hamısı eyni core funksiyanı istifadə edir)
-# ------------------------
-
-
-def handle_msp(text: str) -> str:
-    return _core_handle_msp(text)
-
-
-def handle_msp_message(text: str) -> str:
-    return _core_handle_msp(text)
-
-
-def process_msp_message(text: str) -> str:
-    return _core_handle_msp(text)
+@dataclass
+class MSPCommandResult:
+    success: bool
+    message: str
 
 
 class MSPAgent:
     """
-    Əgər haradasa class-lı API istifadə olunursa, bu da işləsin deyə qoyuruq.
+    MSP — 'Multi-System Processor'
+    Burada:
+      • DS-01 Market Research komandasını emal edir
+      • DriveAgent vasitəsilə Google Drive qovluqları yaradır
     """
+
+    # ---------- PUBLIC MAIN ENTRY ----------
 
     def handle(self, text: str) -> str:
-        return _core_handle_msp(text)
+        """
+        Telegramdan gələn `msp: ....` hissəsi buraya düşür.
+        """
+        cleaned = text.strip()
 
-    def handle_message(self, text: str) -> str:
-        return _core_handle_msp(text)
+        # boşdursa
+        if not cleaned:
+            return "MSP cavabı:\nBoş komanda göndərildi."
+
+        # əvvəl drive komandasını yoxlayaq
+        if cleaned.lower().startswith("drive:"):
+            return self._handle_drive_command(cleaned)
+
+        # sonra DS-01 market research
+        if cleaned.lower().startswith("market:"):
+            return self._handle_ds01_market(cleaned)
+
+        # əks halda tanınmayan komanda
+        return (
+            "MSP cavabı:\n"
+            "Bu komandanı hələ anlamıram.\n\n"
+            "Mümkün komandalar:\n"
+            "• DS-01 Market Research:  market: Niche | Country\n"
+            "• Drive Agent:            drive: PATH/to/folder"
+        )
+
+    # ---------- DS-01 MARKET RESEARCH ----------
+
+    def _parse_market_command(self, cmd: str) -> Optional[Tuple[str, str]]:
+        """
+        Gözlənən format:
+            market: Niche | Country
+        Məsələn:
+            market: pet hair remover | US
+        """
+        # "market:" sözünü sil
+        body = cmd[len("market:") :].strip()
+        if "|" not in body:
+            return None
+
+        parts = [p.strip() for p in body.split("|", maxsplit=1)]
+        if len(parts) != 2 or not parts[0] or not parts[1]:
+            return None
+
+        niche, country = parts
+        return niche, country
+
+    def _handle_ds01_market(self, cmd: str) -> str:
+        parsed = self._parse_market_command(cmd)
+        if not parsed:
+            return (
+                "MSP cavabı:\n"
+                "DS-01 Market Research komandası yanlışdır.\n"
+                "Düzgün format:\n"
+                "  msp: market: Niche | Country\n"
+                "Məsələn:\n"
+                "  msp: market: pet hair remover | US"
+            )
+
+        niche, country = parsed
+
+        # Hal-hazırda bunu DEMO kimi saxlayırıq – real analitika OpenAI balansı aktiv olanda qoşulacaq.
+        return (
+            "MSP cavabı:\n"
+            "DS-01 Market Research nəticəsi:\n"
+            "DS-01 demo rejimindədir.\n"
+            f"Niche: {niche}\n"
+            f"Country: {country}\n\n"
+            "Real market analizi OpenAI balansı aktiv olandan sonra qoşulacaq. "
+            "Hal-hazırda yalnız komanda strukturunu test edirik. 🧠"
+        )
+
+    # ---------- DRIVE AGENT ----------
+
+    def _parse_drive_path(self, cmd: str) -> Optional[str]:
+        """
+        Gözlənən format:
+            drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master
+        Yəni 'drive:' sözündən sonra gələn hər şeyi PATH kimi qəbul edirik.
+        """
+        body = cmd[len("drive:") :].strip()
+        if not body:
+            return None
+        # lazımsız boşluqları bir az təmizləyək
+        body = re.sub(r"\s*/\s*", " / ", body)
+        return body
+
+    def _handle_drive_command(self, cmd: str) -> str:
+        path = self._parse_drive_path(cmd)
+        if not path:
+            return (
+                "MSP cavabı:\n"
+                "Drive Agent komandası yanlışdır.\n"
+                "Düzgün format:\n"
+                "  msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master"
+            )
+
+        # DriveAgent-i çağırırıq
+        try:
+            drive_agent = DriveAgent()
+            result: MSPCommandResult = drive_agent.create_folder_structure(path)  # type: ignore
+        except Exception as e:
+            # DriveAgent daxilində hər hansı xəta olarsa, onu user-friendly göstəririk
+            return (
+                "MSP cavabı:\n"
+                "Drive Agent xətası baş verdi.\n"
+                f"Texniki məlumat: {e}"
+            )
+
+        status = "uğurlu" if result.success else "uğursuz"
+        return f"MSP cavabı:\nDrive Agent nəticəsi ({status}):\n{result.message}"
+
+
+# ==============================
+#  WRAPPER — KÖHNƏ KOD ÜÇÜN
+# ==============================
+
 class MSP:
     """
-    Köhnə kod 'from app.agents.core.msp import MSP' dediyi üçün
-    geriyə uyğunluq (backward compatibility) wrapper-i.
+    Köhnə sistemlə tam uyğunluq üçün wrapper.
+
+    Köhnə backend hələ də belə çağırır:
+        msp = MSP()
+        msp.process(text)
+
+    Yeni sistemdə isə MSPAgent.handle(text) istifadə olunur.
+    Bu wrapper bütün köhnə adları (process, run, execute, __call__) MSPAgent-ə yönləndirir.
     """
+
     def __init__(self):
         self.agent = MSPAgent()
 
+    # Köhnə əsas metod
+    def process(self, text: str) -> str:
+        return self.agent.handle(text)
+
+    # Ehtiyat köhnə adlar
+    def run(self, text: str) -> str:
+        return self.agent.handle(text)
+
+    def execute(self, text: str) -> str:
+        return self.agent.handle(text)
+
+    # Yeni adlar
     def handle(self, text: str) -> str:
         return self.agent.handle(text)
 
     def handle_message(self, text: str) -> str:
-        return self.agent.handle_message(text)
+        return self.agent.handle(text)
 
+    # msp("text") kimi çağırmaq üçün
     def __call__(self, text: str) -> str:
         return self.agent.handle(text)
