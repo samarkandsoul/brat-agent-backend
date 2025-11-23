@@ -13,22 +13,25 @@ class MSP:
         # Təhlükəsizlik üçün boşluqları təmizləyək
         text = text.strip()
 
-        # 1) DRIVE KOMANDASI
+        # 1) DRIVE KOMANDASI – HƏLƏLİK DEMO MOD
         # nümunə:  msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master
         if text.startswith("drive:"):
-            # İçi boş olsa belə, burda heç error atmasın deyə try/except əlavə edirik
-            from app.agents.ds.ds02_drive_agent import DriveAgent  # <-- YOL DÜZDÜR
-
             path = text[len("drive:"):].strip()
-            if not path:
-                return "MSP error: drive path boşdur. Nümunə: `msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master`"
 
-            agent = DriveAgent()
-            try:
-                result = agent.create_folder_path(path)
-                return result
-            except Exception as e:
-                return f"MSP error (DriveAgent): {e}"
+            if not path:
+                return (
+                    "MSP error: drive path boşdur.\n"
+                    "Düzgün format nümunə:\n"
+                    "msp: drive: SamarkandSoulSystem / DS System / "
+                    "DS-01 - Market-Research-Master"
+                )
+
+            # HƏLƏLİK GOOGLE DRIVE-Ə TOXUNMURUQ – SADƏCƏ DEMO CAVAB
+            return (
+                "Drive DEMO cavabı:\n"
+                f"Bu path üçün qovluq strukturu yaradılmalı idi:\n{path}\n\n"
+                "DriveAgent real inteqrasiyasını ayrıca test edib qoşacağıq. 🚧"
+            )
 
         # 2) DS-01 MARKET RESEARCH DEMO
         # nümunə:  msp: market: pet hair remover | US
@@ -51,9 +54,4 @@ class MSP:
                 "DS-01 demo rejimindədir.\n"
                 f"Niche: {niche}\n"
                 f"Country: {country}\n\n"
-                "Real market analizi OpenAI balansı aktiv olandan sonra qoşulacaq. "
-                "Hal-hazırda yalnız komanda strukturunu test edirik. 🧠"
-            )
-
-        # Tanımadığı komanda
-        return "MSP error: Bu MSP komandasını tanımadım. Nümunə: `msp: market: ...` və ya `msp: drive: ...`"
+                "Real market analizi OpenAI balansı aktiv olandan sonra qoş
