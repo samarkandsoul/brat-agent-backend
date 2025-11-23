@@ -141,3 +141,19 @@ class MSPAgent:
 
     def handle_message(self, text: str) -> str:
         return _core_handle_msp(text)
+class MSP:
+    """
+    Köhnə kod 'from app.agents.core.msp import MSP' dediyi üçün
+    geriyə uyğunluq (backward compatibility) wrapper-i.
+    """
+    def __init__(self):
+        self.agent = MSPAgent()
+
+    def handle(self, text: str) -> str:
+        return self.agent.handle(text)
+
+    def handle_message(self, text: str) -> str:
+        return self.agent.handle_message(text)
+
+    def __call__(self, text: str) -> str:
+        return self.agent.handle(text)
