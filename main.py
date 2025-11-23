@@ -4,8 +4,14 @@ import os
 import requests
 
 from app.agents.ds.ds01_market_research import analyze_market, MarketResearchRequest
+from app.agents.core.msp import MSP
 
 app = FastAPI(title="BRAT Backend")
+
+# =========================
+#  MSP CORE
+# =========================
+msp = MSP()
 
 # =========================
 #  ROOT CHECK
@@ -13,7 +19,6 @@ app = FastAPI(title="BRAT Backend")
 @app.get("/")
 def root():
     return {"status": "OK", "message": "BRAT backend running"}
-
 
 # =========================
 #  DS-01 MARKET ANALYZE
@@ -26,51 +31,55 @@ def market_analyze(req: MarketResearchRequest):
     result = analyze_market(req)
     return {"status": "success", "data": result}
 
-
 # =========================
 #  TELEGRAM MASTER AGENT
 # =========================
 
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+
+
 def send_telegram_message(chat_id: int, text: str):
     """
     Cavabı Telegram-a göndərir.
-    Hər çağırışda tokeni env-dən oxuyuruq ki, heç vaxt "donmuş" olmasın.
     """
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
-
-    if not token:
+    if not TELEGRAM_BOT_TOKEN:
         print("TELEGRAM_BOT_TOKEN is not set")
         return
 
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    requests.post(
-        url,
-        json={
-            "chat_id": chat_id,
-            "text": text,
-            "parse_mode": "Markdown",
-            "disable_web_page_preview": True,
-        },
-        timeout=15,
-    )
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+
+    try:
+        requests.post(
+            url,
+            json={
+                "chat_id": chat_id,
+                "text": text,
+                "parse_mode": "Markdown",
+                "disable_web_page_preview": True,
+            },
+            timeout=15,
+        )
+    except Exception as e:
+        print("Telegram send error:", e)
 
 
 def handle_telegram_command(chat_id: int, text: str):
     """
-    Burada "əsas agent" loqikasıdır.
-    Hal-hazırda yalnız 1 komanda dəstəkləyirik:
-
-    market: niche | country
-
-    Məs:
-    market: pet hair remover | US
+    Burada əsas agent loqikasıdır.
+    Hal-hazırda:
+      - /start    -> kömək mesajı
+      - msp: ...  -> MSP skeleton (core beyin)
+      - market:   -> DS-01 market research
     """
     lower = text.strip().lower()
 
-    if lower.startswith("start") or lower.startswith("/start"):
+    # 1) /start komandası
+    if lower.startswith("/start") or lower.startswith("start"):
         msg = (
             "Salam, mən BRAT Core agentiyəm. Hal-hazırda bu komandaları bacarıram:\n\n"
-            "*Market araşdırması:*\n"
+            "*MSP test:*\n"
+            "`msp: hər hansı komanda`\n\n"
+            "*Market araşdırması (DS-01):*\n"
             "`market: Niche | Country`\n\n"
             "Məsələn:\n"
             "`market: pet hair remover | US`"
@@ -78,8 +87,30 @@ def handle_telegram_command(chat_id: int, text: str):
         send_telegram_message(chat_id, msg)
         return
 
+    # 2) MSP komandasI (msp: ... )
+    if lower.startswith("msp:"):
+        try:
+            msp_command = text.split(":", 1)[1].strip()
+        except Exception:
+            msp_command = ""
+
+        if not msp_command:
+            send_telegram_message(
+                chat_id,
+                "MSP komandası boşdur. Format nümunəsi:\n`msp: bugünkü tapşırıqlarım nədir?`",
+            )
+            return
+
+        try:
+            response = msp.process(msp_command)
+        except Exception as e:
+            response = f"MSP error: {e}"
+
+        send_telegram_message(chat_id, f"*MSP cavabı:*\n{response}")
+        return
+
+    # 3) DS-01 Market Research komandasI
     if lower.startswith("market:"):
-        # "market: pet hair remover | US" formatını parse edək
         try:
             after_keyword = text.split(":", 1)[1].strip()
             parts = [p.strip() for p in after_keyword.split("|")]
@@ -90,7 +121,8 @@ def handle_telegram_command(chat_id: int, text: str):
             if not niche:
                 send_telegram_message(
                     chat_id,
-                    "Niche boşdur. Format belə olmalıdır:\n`market: pet hair remover | US`",
+                    "Niche boşdur. Format belə olmalıdır:\n"
+                    "`market: pet hair remover | US`",
                 )
                 return
 
@@ -119,10 +151,12 @@ def handle_telegram_command(chat_id: int, text: str):
             )
         return
 
-    # Default: tanımadığı komanda
+    # 4) Default: tanımadığı komanda
     msg = (
         "Bu komandaları anlayıram:\n\n"
-        "*Market araşdırması:*\n"
+        "*MSP test:*\n"
+        "`msp: hər hansı komanda`\n\n"
+        "*Market araşdırması (DS-01):*\n"
         "`market: Niche | Country`\n"
         "Məsələn:\n"
         "`market: gaming chairs | US`\n\n"
@@ -155,4 +189,5 @@ def telegram_webhook(update: TelegramUpdate):
         handle_telegram_command(chat_id, text)
     except Exception as e:
         print("Telegram webhook error:", e)
+
     return {"ok": True}
