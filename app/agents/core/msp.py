@@ -1,63 +1,143 @@
-from agents.ds.ds02_drive_agent import DriveAgent
+# src/app/agents/core/msp.py
 
-# Drive Agent-i bir dəfə yaradırıq
-drive_agent = DriveAgent()
+import re
+from typing import Tuple
+
+from app.agents.ds.ds02_drive_agent import DriveAgent
 
 
-def handle_msp(text: str) -> str:
+# ------------------------
+# Core MSP logic
+# ------------------------
+
+
+def _parse_msp_text(text: str) -> str:
     """
-    Telegramdan gələn MSP mesajını emal edir və
-    həmişə cavab string qaytarır.
+    'msp:' prefixini təmizləyib qalan hissəni qaytarır.
     """
-    raw = text.strip()
+    if not text:
+        return ""
 
-    # Mesaj msp: ilə başlamırsa
-    if not raw.lower().startswith("msp:"):
-        return "MSP cavabı: Bu MSP komandası deyil brat."
+    # Telegram mesajı: "msp: nəsə nəsə"
+    lowered = text.strip()
+    if lowered.lower().startswith("msp:"):
+        return lowered[4:].strip()
 
-    payload = raw[4:].strip()  # 'drive: ...' və ya 'market: ...'
-    if not payload:
-        return "MSP cavabı: 'msp:' yazdın, amma komanda boş qaldı."
+    return lowered.strip()
 
-    # --- DRIVE KOMANDASI ---
-    # nümunə: msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master
-    if payload.lower().startswith("drive:"):
-        path = payload[6:].strip()
-        if not path:
-            return "MSP cavabı: drive üçün qovluq path-i yazmalıyıq."
-        # Burdan sonra işi DriveAgent görür
-        return drive_agent.process(path)
 
-    # --- MARKET KOMANDASI (DS-01 DEMO) ---
-    # nümunə: msp: market: pet hair remover | US
-    if payload.lower().startswith("market:"):
-        content = payload[len("market:"):].strip()
-        if not content:
-            return (
-                "MSP cavabı: DS-01 üçün belə yazmalıyıq:\n"
-                "msp: market: Niche | Country"
-            )
+def _handle_ds01_market(payload: str) -> str:
+    """
+    DS-01 demo cavabı.
+    Gözlənilən format:
+      'market: <Niche> | <Country>'
+    """
 
-        parts = [p.strip() for p in content.split("|")]
-        niche = parts[0] if len(parts) > 0 else ""
-        country = parts[1] if len(parts) > 1 else ""
+    # nümunə: "market: pet hair remover | US"
+    pattern = r"^market\s*:\s*(.+?)\s*\|\s*(.+)$"
+    m = re.match(pattern, payload.strip(), flags=re.IGNORECASE)
 
+    if not m:
         return (
-            "DS-01 Market Research nəticəsi:\n"
-            "DS-01 demo rejimindədir.\n"
-            f"Niche: {niche}\n"
-            f"Country: {country}\n\n"
-            "Real market analizi OpenAI balansı aktiv olandan sonra qoşulacaq. "
-            "Hal-hazırda yalnız komanda strukturunu test edirik. 🧠"
+            "DS-01 Market Research formatı yanlışdır.\n"
+            "Düzgün format:\n"
+            "msp: market: Niche | Country\n"
+            "Məsələn:\n"
+            "msp: market: pet hair remover | US"
         )
 
-    # --- DEFAULT SKELETON ---
+    niche, country = m.group(1).strip(), m.group(2).strip()
+
     return (
-        "MSP cavabı:\n"
-        f"MSP skeleton received: {payload}"
+        "DS-01 Market Research nəticəsi:\n"
+        "DS-01 demo rejimindədir.\n"
+        f"Niche: {niche}\n"
+        f"Country: {country}\n\n"
+        "Real market analizi OpenAI balansı aktiv olandan sonra qoşulacaq. "
+        "Hal-hazırda yalnız komanda strukturunu test edirik. 🧠"
     )
 
 
-# Bəzi yerlərdə başqa ad istifadə olunubsa, ikisi də işləsin deyə:
-def process_msp(text: str) -> str:
-    return handle_msp(text)
+def _handle_drive(payload: str) -> str:
+    """
+    Drive qovluq strukturu üçün handler.
+    Gözlənilən format:
+      'drive: <path>'
+    Məsələn:
+      'drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master'
+    """
+    path = payload.strip()
+    if path.lower().startswith("drive:"):
+        path = path[len("drive:") :].strip()
+
+    if not path:
+        return (
+            "Drive komandasının formatı yanlışdır.\n"
+            "Düzgün format:\n"
+            "msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master"
+        )
+
+    try:
+        drive_agent = DriveAgent()
+        result = drive_agent.handle_drive_command(
+            path_str=path,
+            user_email="samarkand.soul.ss@gmail.com",
+        )
+        return result
+    except Exception as e:
+        # Hər halda cavab göndərək ki, bot 'susmasın'
+        return f"Drive Agent xəta verdi: {e}"
+
+
+def _core_handle_msp(text: str) -> str:
+    """
+    Bütün MSP mesajları üçün əsas router.
+    """
+    payload = _parse_msp_text(text)
+
+    # boş mesaj
+    if not payload:
+        return "MSP skeleton received: (boş mesaj)."
+
+    lower_payload = payload.lower()
+
+    # DS-01 Market Research
+    if lower_payload.startswith("market:"):
+        return _handle_ds01_market(payload)
+
+    # Drive komandasI
+    if lower_payload.startswith("drive:"):
+        return _handle_drive(payload)
+
+    # Default skeleton cavabı
+    return f"MSP skeleton received: {payload}"
+
+
+# ------------------------
+# Public entrypoints
+# (router hansı adı çağırsa, hamısı eyni core funksiyanı istifadə edir)
+# ------------------------
+
+
+def handle_msp(text: str) -> str:
+    return _core_handle_msp(text)
+
+
+def handle_msp_message(text: str) -> str:
+    return _core_handle_msp(text)
+
+
+def process_msp_message(text: str) -> str:
+    return _core_handle_msp(text)
+
+
+class MSPAgent:
+    """
+    Əgər haradasa class-lı API istifadə olunursa, bu da işləsin deyə qoyuruq.
+    """
+
+    def handle(self, text: str) -> str:
+        return _core_handle_msp(text)
+
+    def handle_message(self, text: str) -> str:
+        return _core_handle_msp(text)
