@@ -1,107 +1,63 @@
-from app.agents.ds.ds01_market_research import analyze_market, MarketResearchRequest
-from app.agents.ds.ds02_drive_agent import DriveAgent
-from app.agents.ds.ds03_shopify_agent import ShopifyAgent
+from agents.ds.ds02_drive_agent import DriveAgent
+
+# Drive Agent-i bir dəfə yaradırıq
+drive_agent = DriveAgent()
 
 
-class MSP:
+def handle_msp(text: str) -> str:
     """
-    MSP – Master Strategy Processor.
-    Bütün agentləri yönləndirən əsas beyin moduludur.
+    Telegramdan gələn MSP mesajını emal edir və
+    həmişə cavab string qaytarır.
     """
+    raw = text.strip()
 
-    def __init__(self) -> None:
-        # Agent obyektləri
-        self.drive_agent = DriveAgent()
-        self.shopify_agent = ShopifyAgent()
+    # Mesaj msp: ilə başlamırsa
+    if not raw.lower().startswith("msp:"):
+        return "MSP cavabı: Bu MSP komandası deyil brat."
 
-    def process(self, raw_command: str) -> str:
-        """
-        Telegram-dan gələn MSP komandalarını emal edir.
-        """
-        text = (raw_command or "").strip()
-        if not text:
-            return "MSP: Boş komanda alındı."
+    payload = raw[4:].strip()  # 'drive: ...' və ya 'market: ...'
+    if not payload:
+        return "MSP cavabı: 'msp:' yazdın, amma komanda boş qaldı."
 
-        lower = text.lower()
+    # --- DRIVE KOMANDASI ---
+    # nümunə: msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master
+    if payload.lower().startswith("drive:"):
+        path = payload[6:].strip()
+        if not path:
+            return "MSP cavabı: drive üçün qovluq path-i yazmalıyıq."
+        # Burdan sonra işi DriveAgent görür
+        return drive_agent.process(path)
 
-        # =========================
-        # DS-01: MARKET RESEARCH
-        # =========================
-        if lower.startswith("market"):
-            niche = ""
-            country = "US"
+    # --- MARKET KOMANDASI (DS-01 DEMO) ---
+    # nümunə: msp: market: pet hair remover | US
+    if payload.lower().startswith("market:"):
+        content = payload[len("market:"):].strip()
+        if not content:
+            return (
+                "MSP cavabı: DS-01 üçün belə yazmalıyıq:\n"
+                "msp: market: Niche | Country"
+            )
 
-            if ":" in text:
-                after = text.split(":", 1)[1].strip()
-            else:
-                after = text.split(" ", 1)[1].strip() if " " in text else ""
+        parts = [p.strip() for p in content.split("|")]
+        niche = parts[0] if len(parts) > 0 else ""
+        country = parts[1] if len(parts) > 1 else ""
 
-            if after:
-                parts = [p.strip() for p in after.split("|")]
-                if len(parts) >= 1:
-                    niche = parts[0]
-                if len(parts) >= 2 and parts[1]:
-                    country = parts[1]
+        return (
+            "DS-01 Market Research nəticəsi:\n"
+            "DS-01 demo rejimindədir.\n"
+            f"Niche: {niche}\n"
+            f"Country: {country}\n\n"
+            "Real market analizi OpenAI balansı aktiv olandan sonra qoşulacaq. "
+            "Hal-hazırda yalnız komanda strukturunu test edirik. 🧠"
+        )
 
-            if not niche:
-                return (
-                    "MSP: `market` komandası üçün format belə olmalıdır:\n"
-                    "market: Niche | Country\n"
-                    "Məsələn: market: pet hair remover | US"
-                )
+    # --- DEFAULT SKELETON ---
+    return (
+        "MSP cavabı:\n"
+        f"MSP skeleton received: {payload}"
+    )
 
-            try:
-                req = MarketResearchRequest(niche=niche, country=country)
-                result = analyze_market(req)
 
-                if isinstance(result, dict) and "error" in result:
-                    return f"DS-01 error: {result}"
-
-                return f"DS-01 Market Research nəticəsi:\n{result}"
-            except Exception as e:
-                return f"MSP: DS-01 çağırılarkən xəta baş verdi: {e!r}"
-
-        # =========================
-        # DS-02: DRIVE AGENT
-        # =========================
-        if lower.startswith("drive"):
-            if ":" in raw_command:
-                payload = raw_command.split(":", 1)[1].strip()
-            else:
-                payload = raw_command.split(" ", 1)[1].strip() if " " in raw_command else ""
-
-            if not payload:
-                return (
-                    "Drive Agent üçün komanda boşdur.\n"
-                    "Nümunə: drive: Samarkand Soul üçün yeni qovluq yarat"
-                )
-
-            try:
-                return self.drive_agent.process(payload)
-            except Exception as e:
-                return f"Drive Agent xətaya düşdü: {e!r}"
-
-        # =========================
-        # DS-03: SHOPIFY AGENT
-        # =========================
-        if lower.startswith("shopify"):
-            if ":" in raw_command:
-                payload = raw_command.split(":", 1)[1].strip()
-            else:
-                payload = raw_command.split(" ", 1)[1].strip() if " " in raw_command else ""
-
-            if not payload:
-                return (
-                    "Shopify Agent üçün komanda boşdur.\n"
-                    "Nümunə: shopify: kolleksiya yarat"
-                )
-
-            try:
-                return self.shopify_agent.process(payload)
-            except Exception as e:
-                return f"Shopify Agent xətaya düşdü: {e!r}"
-
-        # =========================
-        # DEFAULT – TANINMAYAN KOMANDA
-        # =========================
-        return f"MSP skeleton received: {text}"
+# Bəzi yerlərdə başqa ad istifadə olunubsa, ikisi də işləsin deyə:
+def process_msp(text: str) -> str:
+    return handle_msp(text)
