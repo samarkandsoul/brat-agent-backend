@@ -1,51 +1,150 @@
+# app/agents/ds/ds02_drive_agent.py
+
 import os
-from google.oauth2 import service_account
+import json
+from typing import Optional
+
 from googleapiclient.discovery import build
+from google.oauth2 import service_account
+
 
 class DriveAgent:
-    def __init__(self):
-        # Render env-dən Service Account JSON almaq
-        service_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
-        if not service_json:
-            raise Exception("Service Account JSON tapılmadı (GOOGLE_SERVICE_ACCOUNT_JSON)")
+    """
+    Google Drive ilə işləyən real agent.
+    Verilən path üzrə (SamarkandSoulSystem / DS System / ...) qovluq zəncirini
+    tapır, olmayanları yaradır və son qovluğun linkini qaytarır.
+    """
 
-        # Credential yarat
-        credentials = service_account.Credentials.from_service_account_info(
-            eval(service_json),
-            scopes=['https://www.googleapis.com/auth/drive']
+    def __init__(self) -> None:
+        # Service account JSON-u environment-dən oxuyuruq
+        raw_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
+        if not raw_json:
+            raise RuntimeError(
+                "GOOGLE_SERVICE_ACCOUNT_JSON env dəyişəni tapılmadı. "
+                "Render-də service account JSON mətnini bu dəyişənə yazmaq lazımdır."
+            )
+
+        try:
+            info = json.loads(raw_json)
+        except json.JSONDecodeError:
+            raise RuntimeError(
+                "GOOGLE_SERVICE_ACCOUNT_JSON düzgün JSON deyil. "
+                "Service account .json faylının tam məzmununu oraya copy etməlisən."
+            )
+
+        scopes = ["https://www.googleapis.com/auth/drive"]
+        creds = service_account.Credentials.from_service_account_info(
+            info,
+            scopes=scopes,
         )
 
-        self.drive = build('drive', 'v3', credentials=credentials)
+        # Drive API v3 client
+        self.service = build("drive", "v3", credentials=creds)
 
-    def create_folder(self, name, parent_id=None):
-        file_metadata = {
+    # ======== DAXİLİ KÖMƏKÇİ METODLAR ========
+
+    def _find_folder(self, name: str, parent_id: Optional[str]) -> Optional[str]:
+        """
+        Verilən ad və parent-id üçün mövcud qovluğu tapır.
+        Tapmasa None qaytarır.
+        """
+        # Parent varsa onu da query-yə əlavə edirik
+        if parent_id:
+            q = (
+                f"name = '{name}' "
+                "and mimeType = 'application/vnd.google-apps.folder' "
+                "and trashed = false "
+                f"and '{parent_id}' in parents"
+            )
+        else:
+            q = (
+                f"name = '{name}' "
+                "and mimeType = 'application/vnd.google-apps.folder' "
+                "and trashed = false"
+            )
+
+        resp = (
+            self.service.files()
+            .list(
+                q=q,
+                spaces="drive",
+                fields="files(id, name)",
+                pageSize=5,
+            )
+            .execute()
+        )
+
+        files = resp.get("files", [])
+        if not files:
+            return None
+
+        # Birincini götürürük (adı eyni olan birdən çox qovluq olsa belə)
+        return files[0]["id"]
+
+    def _create_folder(self, name: str, parent_id: Optional[str]) -> str:
+        """
+        Verilən adla (və parent varsa) yeni qovluq yaradır və id qaytarır.
+        """
+        metadata = {
             "name": name,
-            "mimeType": "application/vnd.google-apps.folder"
+            "mimeType": "application/vnd.google-apps.folder",
         }
+
         if parent_id:
-            file_metadata["parents"] = [parent_id]
+            metadata["parents"] = [parent_id]
 
-        folder = self.drive.files().create(body=file_metadata, fields="id").execute()
-        return folder.get("id")
+        folder = (
+            self.service.files()
+            .create(
+                body=metadata,
+                fields="id",
+            )
+            .execute()
+        )
 
-    def find_or_create(self, name, parent_id=None):
-        query = f"name = '{name}' and mimeType = 'application/vnd.google-apps.folder'"
-        if parent_id:
-            query += f" and '{parent_id}' in parents"
+        return folder["id"]
 
-        results = self.drive.files().list(
-            q=query, spaces='drive', fields="files(id, name)"
-        ).execute()
+    # ======== İCTİMAİ METOD ========
 
-        files = results.get("files", [])
-        if files:
-            return files[0]["id"]
+    def create_folder_path(self, path: str) -> str:
+        """
+        Məsələn:
+        path = 'SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master'
+        """
+        clean = path.strip()
+        if not clean:
+            raise ValueError("Drive path boşdur.")
 
-        return self.create_folder(name, parent_id)
+        # 'A / B / C' -> ['A', 'B', 'C']
+        parts = [p.strip() for p in clean.split("/") if p.strip()]
+        if not parts:
+            raise ValueError("Drive path doğru formatda deyil.")
 
-    def create_folder_path(self, path: str):
-        parts = [p.strip() for p in path.split("/") if p.strip()]
-        parent = None
-        for p in parts:
-            parent = self.find_or_create(p, parent)
-        return f"Drive qovluqları yaradıldı: {path}"
+        parent_id: Optional[str] = None
+        created_any = False
+
+        for part in parts:
+            # 1) Mövcud qovluğu axtar
+            folder_id = self._find_folder(part, parent_id)
+
+            # 2) Tapılmadısa – yarat
+            if folder_id is None:
+                folder_id = self._create_folder(part, parent_id)
+                created_any = True
+
+            parent_id = folder_id
+
+        final_id = parent_id
+        folder_link = f"https://drive.google.com/drive/folders/{final_id}"
+
+        if created_any:
+            status = "Yeni qovluq strukturu yaradıldı."
+        else:
+            status = "Bu qovluq strukturu artıq mövcuddur."
+
+        return (
+            "MSP cavabı:\n"
+            f"{status}\n"
+            f"Path: {clean}\n"
+            f"Link: {folder_link}"
+        )
