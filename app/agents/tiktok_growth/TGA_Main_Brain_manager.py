@@ -8,6 +8,7 @@ from .trend_brain import TrendBrain
 from .video_lab import VideoLab, VideoRenderResult
 from .tiktok_api_client import TikTokApiClient
 
+
 @dataclass
 class TGAVideoDraft:
     """Represents a single video idea or draft before posting."""
@@ -26,7 +27,7 @@ class TikTokGrowthAgent:
     High-level responsibilities:
       - Plan daily videos (via TrendBrain)
       - Ask VideoLab to prepare previews
-      - Send previews for Telegram approval
+      - Build Telegram payloads for human approval
       - (Later) Post approved videos to TikTok
       - (Later) Read comments & analytics
       - (Later) Propose improvements for the next day
@@ -36,6 +37,7 @@ class TikTokGrowthAgent:
         self.video_queue: List[TGAVideoDraft] = []
         self.trend_brain = TrendBrain()
         self.video_lab = VideoLab()
+        self.tiktok_client = TikTokApiClient()  # not used yet, just ready
 
     # ===== PUBLIC ENTRYPOINTS =====
 
@@ -110,22 +112,83 @@ class TikTokGrowthAgent:
 
     def send_previews_for_approval(self) -> None:
         """
-        Send video previews to Telegram for human approval.
-        For now, we just print them to the console.
-        Later this will call the real Telegram bot API.
+        Build Telegram-friendly payloads and (for now) just log them.
+        Later, MSP / bot layer will call build_telegram_preview_payloads()
+        and actually send these via Telegram Bot API.
         """
-        print("[TGA] Sending previews for approval (console stub)...")
+        print("[TGA] Preparing previews for Telegram approval (console stub)...")
+
+        payloads = self.build_telegram_preview_payloads()
+
+        for payload in payloads:
+            print("[TGA] TELEGRAM PREVIEW PAYLOAD:", payload)
+
+        print("[TGA] All previews 'prepared' for Telegram (stub).")
+
+    # ===== TELEGRAM PAYLOAD BUILDERS =====
+
+    def build_telegram_preview_payloads(self) -> List[Dict[str, Any]]:
+        """
+        Return a list of dicts that Telegram bot can use directly.
+
+        Each payload has shape:
+          {
+            "text": "...",
+            "reply_markup": {
+                "inline_keyboard": [
+                    [
+                        {"text": "✅ Approve", "callback_data": "tga_approve:<draft_id>"},
+                        {"text": "❌ Reject",  "callback_data": "tga_reject:<draft_id>"}
+                    ]
+                ]
+            }
+          }
+
+        MSP / bot layer is responsible for:
+          - looping over this list
+          - calling sendMessage(chat_id, **payload)
+          - routing callback_data back to handle_telegram_approval()
+        """
+        payloads: List[Dict[str, Any]] = []
 
         for draft in self.video_queue:
             render_meta = draft.meta.get("render", {})
-            preview_note = render_meta.get("preview_note", "no preview note")
+            preview_note = render_meta.get("preview_note", "")
 
-            print(
-                f"[TGA] PREVIEW -> id={draft.id} | title={draft.title} | "
-                f"status={draft.status} | preview='{preview_note}'"
-            )
+            text_lines = [
+                "📹 *TikTok Draft Preview*",
+                "",
+                f"*ID:* `{draft.id}`",
+                f"*Title:* {draft.title}",
+                "",
+                f"*Preview:* {preview_note}",
+                "",
+                "_Approve to schedule this video for posting._",
+            ]
+            text = "\n".join(text_lines)
 
-        print("[TGA] All previews 'sent' (console stub).")
+            payload = {
+                "text": text,
+                "parse_mode": "Markdown",
+                "reply_markup": {
+                    "inline_keyboard": [
+                        [
+                            {
+                                "text": "✅ Approve",
+                                "callback_data": f"tga_approve:{draft.id}",
+                            },
+                            {
+                                "text": "❌ Reject",
+                                "callback_data": f"tga_reject:{draft.id}",
+                            },
+                        ]
+                    ]
+                },
+            }
+
+            payloads.append(payload)
+
+        return payloads
 
     # ===== HELPER METHODS =====
 
