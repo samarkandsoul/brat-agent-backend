@@ -55,7 +55,14 @@ class ShopifyAdminClient:
             "X-Shopify-Access-Token": self.token,
         }
 
-        resp = requests.request(method, url, headers=headers, json=json, params=params, timeout=30)
+        resp = requests.request(
+            method,
+            url,
+            headers=headers,
+            json=json,
+            params=params,
+            timeout=30,
+        )
 
         if not resp.ok:
             raise RuntimeError(
@@ -120,7 +127,11 @@ class ShopifyAdminClient:
         print("[ShopifyAdminClient] Created product:", data.get("product", {}).get("id"))
         return data
 
-    def create_or_update_coming_soon_page(self, title: str, body_html: str) -> Dict[str, Any]:
+    def create_or_update_coming_soon_page(
+        self,
+        title: str,
+        body_html: str,
+    ) -> Dict[str, Any]:
         """
         Creates or updates a 'coming-soon' page.
 
@@ -156,4 +167,27 @@ class ShopifyAdminClient:
         }
         data = self._request("POST", "/pages.json", json=payload)
         print("[ShopifyAdminClient] Created coming-soon page:", data.get("page", {}).get("id"))
+        return data
+
+    def create_collection(
+        self,
+        title: str,
+        body_html: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Creates a simple manual custom collection.
+        """
+        payload = {
+            "custom_collection": {
+                "title": title,
+                "body_html": body_html,
+                "published": True,
+            }
+        }
+
+        data = self._request("POST", "/custom_collections.json", json=payload)
+        print(
+            "[ShopifyAdminClient] Created collection:",
+            data.get("custom_collection", {}).get("id"),
+        )
         return data
