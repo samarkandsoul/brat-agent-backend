@@ -90,3 +90,79 @@ def setup_coming_soon_page() -> str:
 
     client.create_or_update_coming_soon_page(title=title, body_html=body_html)
     return "✅ 'Coming Soon' page is created/updated in Shopify (handle: /pages/coming-soon)."
+
+
+def create_product_from_prompt(raw: str) -> str:
+    """
+    Parse a simple text prompt and create a product.
+
+    Expected format:
+      TITLE | PRICE | OPTIONAL_IMAGE_URL
+
+    Example:
+      Samarkand Soul Ivory Tablecloth | 49.90 | https://image-url.jpg
+    """
+    raw = (raw or "").strip()
+    if not raw:
+        return (
+            "Shopify add usage:\n"
+            "  msp: shopify: add | Title | Price | OptionalImageURL\n"
+        )
+
+    parts = [p.strip() for p in raw.split("|")]
+    if len(parts) < 2:
+        return (
+            "Shopify add error: I need at least Title and Price.\n"
+            "Nümunə:\n"
+            "  msp: shopify: add | Samarkand Soul Ivory Tablecloth | 49.90"
+        )
+
+    title = parts[0]
+    price = parts[1]
+    image_url = parts[2] if len(parts) > 2 else None
+
+    description = (
+        "<p>Premium Samarkand Soul tablecloth.</p>"
+        "<p>Inspired by the soul of Samarkand, crafted for modern homes.</p>"
+    )
+
+    spec = ShopifyDemoProductSpec(
+        title=title,
+        description=description,
+        price=price,
+        tags=["samarkand soul", "tablecloth"],
+        image_url=image_url,
+    )
+    return create_demo_product(spec)
+
+
+def create_collection(name: str) -> str:
+    """
+    Create a simple manual collection for Samarkand Soul.
+    """
+    name = (name or "").strip()
+    if not name:
+        return (
+            "Shopify collection usage:\n"
+            "  msp: shopify: collection | Premium Tablecloths"
+        )
+
+    try:
+        client = ShopifyAdminClient()
+    except ShopifyConfigError as e:
+        return f"Shopify config error: {e}"
+
+    body_html = (
+        f"<p>Curated Samarkand Soul collection: {name}."
+        "</p><p>Premium home textile pieces for modern interiors.</p>"
+    )
+    data = client.create_collection(title=name, body_html=body_html)
+    cid = data.get("custom_collection", {}).get("id")
+    handle = data.get("custom_collection", {}).get("handle")
+
+    return (
+        "✅ Collection created in Shopify.\n"
+        f"ID: {cid}\n"
+        f"Handle: {handle}\n"
+        f"Admin URL: /admin/collections/{cid}"
+    )
