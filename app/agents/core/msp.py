@@ -287,18 +287,12 @@ class MSP:
         # Sadə idarəetmə üçün:
         #   msp: tga: start
         #   msp: tiktok: start
-        # TGA-nın günlük cycle-ını işə salır və preview-ları hazır edir.
+        # TGA-nın günlük cycle-ını işə salır və draftların overview-ni qaytarır.
         # ==========================================================
         if lowered.startswith("tga:") or lowered.startswith("tiktok:"):
-            # Məzmunu hələ istifadə etməsək də gələcəkdə action-lara görə ayıra bilərik
-            # Məs: "tga: preview", "tga: rerun" və s.
             self.tga.run_daily_cycle()
-            return (
-                "TGA — TikTok Growth Agent işə salındı.\n"
-                "Bu gün üçün video draftları planlaşdırıldı və stub preview-lar hazırlandı.\n"
-                "Telegram bot layer: MSP.build_tga_preview_payloads() çağıraraq həmin preview-ları "
-                "Zahid Brat-a göndərə bilər. 📹"
-            )
+            summary = self.tga.get_text_preview_summary()
+            return summary
 
         # ==========================================================
         # 5) TANINMAYAN KOMANDA
