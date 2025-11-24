@@ -224,9 +224,12 @@ class MSP:
         #   msp: shopify: test
         #   msp: shopify: demo
         #   msp: shopify: comingsoon
+        #   msp: shopify: add | Title | Price | OptionalImageURL
+        #   msp: shopify: collection | Premium Tablecloths
         # ==========================================================
         if lowered.startswith("shopify:"):
-            body = text[len("shopify:"):].strip().lower()
+            raw_body = text[len("shopify:"):].strip()
+            lowered_body = raw_body.lower()
 
             try:
                 from app.agents.ds.ds03_shopify_agent import (
@@ -234,14 +237,18 @@ class MSP:
                     create_demo_product,
                     setup_coming_soon_page,
                     ShopifyDemoProductSpec,
+                    create_product_from_prompt,
+                    create_collection,
                 )
             except Exception as e:  # pylint: disable=broad-except
                 return f"MSP error: DS03 Shopify agent import failed: {e}"
 
-            if body.startswith("test"):
+            # --- test ---
+            if lowered_body.startswith("test"):
                 return test_shopify_connection()
 
-            if body.startswith("demo"):
+            # --- demo product ---
+            if lowered_body.startswith("demo"):
                 spec = ShopifyDemoProductSpec(
                     title="Samarkand Soul Demo Tablecloth",
                     description="""
@@ -250,18 +257,39 @@ class MSP:
                     """,
                     price="39.90",
                     tags=["samarkand soul", "demo", "tablecloth"],
-                    image_url=None,  # optional: you can paste an image URL here
+                    image_url=None,  # istəsən bura şəkil URL-i qoya bilərik
                 )
                 return create_demo_product(spec)
 
-            if body.startswith("comingsoon"):
+            # --- coming soon page ---
+            if lowered_body.startswith("comingsoon"):
                 return setup_coming_soon_page()
+
+            # --- add product via text prompt ---
+            if lowered_body.startswith("add"):
+                # gözlənən format:
+                #   add | Title | Price | OptionalImageURL
+                after = raw_body[3:].strip()
+                if after.startswith("|"):
+                    after = after[1:].strip()
+                return create_product_from_prompt(after)
+
+            # --- create collection ---
+            if lowered_body.startswith("collection"):
+                # format:
+                #   collection | Premium Tablecloths
+                after = raw_body[len("collection"):].strip()
+                if after.startswith("|"):
+                    after = after[1:].strip()
+                return create_collection(after)
 
             return (
                 "Shopify agent commands:\n"
-                "  • msp: shopify: test        → check Shopify connection\n"
-                "  • msp: shopify: demo        → create demo product (draft)\n"
-                "  • msp: shopify: comingsoon  → create/update 'coming soon' page\n"
+                "  • msp: shopify: test\n"
+                "  • msp: shopify: demo\n"
+                "  • msp: shopify: comingsoon\n"
+                "  • msp: shopify: add | Title | Price | OptionalImageURL\n"
+                "  • msp: shopify: collection | Collection Name\n"
             )
 
         # ==========================================================
@@ -322,6 +350,6 @@ class MSP:
             "  • msp: ds05: product page copy yaz pet hair remover üçün\n"
             "  • msp: life01: sağlamlıq və vərdiş planı ver\n"
             "  • msp: sys01: sistem bilik bazası haqqında izah et\n"
-            "  • msp: shopify: test / demo / comingsoon\n"
+            "  • msp: shopify: test / demo / comingsoon / add / collection\n"
             "  • msp: tga: start  (TikTok Growth Agent günlük cycle)\n"
-        )
+            )
