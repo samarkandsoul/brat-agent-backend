@@ -1,8 +1,5 @@
 # app/agents/core/msp.py
 
-from typing import Optional
-
-
 class MSP:
     """
     MSP (Main Service Processor) - Samarkand Soul botunun əsas router-i.
