@@ -14,9 +14,10 @@ class OfferPricingAgent:
             return "DS-04 error: boş sual göndərilib."
 
         return (
-            "DS-04 Offer & Pricing Strategist (DEMO)\n"
-            "Məhsul üçün ilkin offer analizi:\n\n"
-            f"📌 Giriş: {text}\n\n"
-            "✨ Bu agent real OpenAI analitikasına qoşulanda tam qiymət, bundle, upsell və offer strukturunu çıxaracaq.\n"
-            "Hazırda DEMO cavab qaytarılır."
+            "DS-04 — Offer & Pricing Strategist (DEMO)\n"
+            "Məhsul üçün ilkin offer və pricing analizi:\n\n"
+            f"📌 Giriş mətni: {text}\n\n"
+            "✨ Bu agent real OpenAI analitikasına qoşulanda sənə konkret qiymət, bundle, "
+            "upsell və offer strukturu verəcək.\n"
+            "Hazırda isə yalnız DEMO cavab qaytarırıq. 🧠"
         )
