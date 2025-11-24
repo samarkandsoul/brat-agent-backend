@@ -2,7 +2,7 @@
 
 from typing import Tuple, List, Dict, Any, Optional
 
-from app.agents.tiktok_growth import TikTokGrowthAgent
+from app.agents.tiktok_growth.TGA_Main_Brain_manager import TikTokGrowthAgent
 
 
 class MSP:
@@ -95,13 +95,9 @@ class MSP:
         """
         Telegram callback_data üçün router.
 
-        Hal-hazırda yalnız TGA üçün callback-lər:
+        Hal-hazırda yalnız TGA için callback-lər:
           - tga_approve:<draft_id>
           - tga_reject:<draft_id>
-
-        Return:
-          - str -> istifadəçiyə göndəriləcək cavab mətni
-          - None -> bu callback MSP tərəfindən tanınmadı, başqa router baxa bilər
         """
         if not callback_data:
             return None
@@ -116,8 +112,7 @@ class MSP:
             self.tga.handle_telegram_approval(draft_id, approved=False)
             return "❌ Video rədd edildi. Yeni variant generasiya olunacaq."
 
-        # Başqa callback tipləri üçün None qaytarırıq
-        return None
+        return None  # Başqa callback tipləri üçün
 
     # =========================
     #  Main entrypoint (text mesajlar)
@@ -125,15 +120,6 @@ class MSP:
     def process(self, raw_text: str) -> str:
         """
         Telegramdan gələn bütün MSP *mətn* komandaları üçün giriş nöqtəsi.
-
-        Nümunələr:
-          - msp: market: pet hair remover | US
-          - msp: offer: pet hair remover üçün ideal qiymət və bundle ideyaları | US market
-          - msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master
-          - msp: ds05: product page yaz
-          - msp: life01: sağlamlıq planı ver
-          - msp: sys01: bilik bazasını izah et
-          - msp: tga: start   (TikTok Growth Agent-i işə salmaq üçün)
         """
         if not raw_text:
             return "MSP error: boş mesaj gəldi."
@@ -146,10 +132,6 @@ class MSP:
 
         # ==========================================================
         # 1) DS-01 MARKET RESEARCH (real modul)
-        # ----------------------------------------------------------
-        # Format:
-        #   msp: market: Niche | Country
-        #   msp: ds01: Niche | Country
         # ==========================================================
         if lowered.startswith("market:") or lowered.startswith("ds01:"):
             if lowered.startswith("market:"):
@@ -191,7 +173,7 @@ class MSP:
             return f"DS-01 Market Research nəticəsi:\n{result}"
 
         # ==========================================================
-        # 2) DS-04 OFFER & PRICING (stub, həm 'offer:', həm də 'ds04:')
+        # 2) DS-04 OFFER & PRICING (stub)
         # ==========================================================
         if lowered.startswith("offer:") or lowered.startswith("ds04:"):
             if lowered.startswith("offer:"):
@@ -219,8 +201,6 @@ class MSP:
 
         # ==========================================================
         # 3) DRIVE DEMO
-        # ----------------------------------------------------------
-        # msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master
         # ==========================================================
         if lowered.startswith("drive:"):
             path = text[len("drive:"):].strip()
@@ -239,12 +219,6 @@ class MSP:
 
         # ==========================================================
         # 4) GENERIC DS / LIFE / SYS KOMANDALARI
-        # ----------------------------------------------------------
-        # Formatlar:
-        #   msp: ds05: ...
-        #   msp: life01: ...
-        #   msp: sys01: ...
-        # Bu mərhələdə hamısı STUB / DEMO cavab qaytarır.
         # ==========================================================
         if ":" in text:
             prefix, _, body = text.partition(":")
@@ -283,11 +257,6 @@ class MSP:
 
         # ==========================================================
         # 4.5) TGA – TikTok Growth Agent tekst trigger-i
-        # ----------------------------------------------------------
-        # Sadə idarəetmə üçün:
-        #   msp: tga: start
-        #   msp: tiktok: start
-        # TGA-nın günlük cycle-ını işə salır və draftların overview-ni qaytarır.
         # ==========================================================
         if lowered.startswith("tga:") or lowered.startswith("tiktok:"):
             self.tga.run_daily_cycle()
@@ -307,4 +276,4 @@ class MSP:
             "  • msp: life01: sağlamlıq və vərdiş planı ver\n"
             "  • msp: sys01: sistem bilik bazası haqqında izah et\n"
             "  • msp: tga: start  (TikTok Growth Agent günlük cycle)\n"
-            )
+        )
