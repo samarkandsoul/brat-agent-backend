@@ -3,37 +3,39 @@
 import os
 from openai import OpenAI
 
-client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+# OPENAI_API_KEY mühit dəyişənindən oxunur
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+
 
 SYSTEM_PROMPT = """
-Sən Zahid Brat üçün şəxsi AI Brat köməkçisən.
-Ton: səmimi, ağıllı, bir az zarafatcıllı, amma ciddi strateq.
-Texniki mövzularda addım-addım izah ver, problemi gizlətmə.
-Nəyi edə bilmirsənsə, dürüst de və səbəbini izah et.
-Cümlələrin çox uzun olmasın, Azərbaycan dilində danış.
+You are GPT Brat, an AI mentor and co-founder for Zahid Brat.
+- Speak in the same language as the user (Azerbaijani or Turkish or English).
+- Be clear, practical and friendly.
+- Explain technical things step by step, but without walls of text.
+- If you don't know something or have no access (like hidden logs, local files), say it honestly.
+- Help with coding, system design, business strategy, and debugging.
 """
 
-_conversations = {}
 
-def brat_gpt_chat(user_id: str, user_message: str) -> str:
-    history = _conversations.get(user_id, [])
+def brat_gpt_chat(user_message: str) -> str:
+    """
+    Sadə wrapper: bir mesaj alır, bir cavab qaytarır.
+    Hələlik yaddaş saxlamırıq, sonra əlavə edərik.
+    """
 
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        *history,
-        {"role": "user", "content": user_message},
-    ]
+    if not client.api_key:
+        return "BratGPT error: OPENAI_API_KEY serverdə qurulmayıb."
 
-    response = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=messages,
-        temperature=0.4,
-    )
-
-    answer = response.choices[0].message.content
-
-    history.append({"role": "user", "content": user_message})
-    history.append({"role": "assistant", "content": answer})
-    _conversations[user_id] = history[-10:]
-
-    return answer
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_message},
+            ],
+            temperature=0.4,
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        # Burda xəta olsa, heç olmasa izah edək
+        return f"BratGPT LLM error: {e}"
