@@ -30,14 +30,12 @@ class MSP:
             text = text[4:].strip()  # 'msp:' 4 simvol
 
         # ==========================================================
-        # 1) DRIVE KOMANDASI
+        # 1) DRIVE KOMANDASI (full debug-lu)
         # ----------------------------------------------------------
         # Nümunə:
         #   msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master
         # ==========================================================
         if text.lower().startswith("drive:"):
-            from app.agents.ds.ds02_drive_agent import DriveAgent
-
             path = text[len("drive:"):].strip()
 
             if not path:
@@ -47,14 +45,24 @@ class MSP:
                     "DS-01 - Market-Research-Master"
                 )
 
+            # 1) Import-u ayrıca yoxlayaq
+            try:
+                from app.agents.ds.ds02_drive_agent import DriveAgent
+            except Exception as e:
+                return f"MSP error: DriveAgent import xətası: {e}"
+
+            # 2) Agent obyektinin yaradılmasını ayrıca yoxlayaq
             try:
                 agent = DriveAgent()
+            except Exception as e:
+                return f"MSP error: DriveAgent init xətası: {e}"
+
+            # 3) Qovluq path-i yaratmağı ayrıca yoxlayaq
+            try:
                 result = agent.create_folder_path(path)
-                # DriveAgent-dən gələn cavabı olduğu kimi qaytarırıq
                 return result
-            except Exception as e:  # pylint: disable=broad-except
-                # Burda exception-u uduruq ki, bütün servisi yıxmasın
-                return f"MSP error (DriveAgent): {e}"
+            except Exception as e:
+                return f"MSP error: DriveAgent create_folder_path xətası: {e}"
 
         # ==========================================================
         # 2) DS-01 MARKET RESEARCH DEMO
@@ -100,4 +108,4 @@ class MSP:
             "  • msp: market: pet hair remover | US\n"
             "  • msp: drive: SamarkandSoulSystem / DS System / "
             "DS-01 - Market-Research-Master"
-            )
+                )
