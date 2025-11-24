@@ -1,6 +1,8 @@
 # app/agents/core/msp.py
 
-from typing import Tuple
+from typing import Tuple, List, Dict, Any, Optional
+
+from app.agents.tiktok_growth import TikTokGrowthAgent
 
 
 class MSP:
@@ -49,6 +51,9 @@ class MSP:
             "sys05": "FUTURE-ROADMAP & INNOVATION-PLANNER",
         }
 
+        # TikTok Growth Agent (TGA) – TikTok kontent fabriki
+        self.tga = TikTokGrowthAgent()
+
     # =========================
     #  Helper-lər
     # =========================
@@ -73,11 +78,53 @@ class MSP:
         return parts[0], parts[1]
 
     # =========================
-    #  Main entrypoint
+    #  TGA – TikTok Growth Agent helper-ləri
+    # =========================
+    def build_tga_preview_payloads(self) -> List[Dict[str, Any]]:
+        """
+        TikTok Growth Agent üçün Telegram-a uyğun preview payload-larını qaytarır.
+
+        MSP-dən kənardakı bot layer bunu belə istifadə edə bilər:
+            payloads = msp.build_tga_preview_payloads()
+            for p in payloads:
+                bot.send_message(chat_id, **p)
+        """
+        return self.tga.build_telegram_preview_payloads()
+
+    def process_callback(self, callback_data: str) -> Optional[str]:
+        """
+        Telegram callback_data üçün router.
+
+        Hal-hazırda yalnız TGA üçün callback-lər:
+          - tga_approve:<draft_id>
+          - tga_reject:<draft_id>
+
+        Return:
+          - str -> istifadəçiyə göndəriləcək cavab mətni
+          - None -> bu callback MSP tərəfindən tanınmadı, başqa router baxa bilər
+        """
+        if not callback_data:
+            return None
+
+        if callback_data.startswith("tga_approve:"):
+            draft_id = callback_data.split(":", 1)[1]
+            self.tga.handle_telegram_approval(draft_id, approved=True)
+            return "✅ Video təsdiqləndi. Posting üçün növbəyə əlavə olundu."
+
+        if callback_data.startswith("tga_reject:"):
+            draft_id = callback_data.split(":", 1)[1]
+            self.tga.handle_telegram_approval(draft_id, approved=False)
+            return "❌ Video rədd edildi. Yeni variant generasiya olunacaq."
+
+        # Başqa callback tipləri üçün None qaytarırıq
+        return None
+
+    # =========================
+    #  Main entrypoint (text mesajlar)
     # =========================
     def process(self, raw_text: str) -> str:
         """
-        Telegramdan gələn bütün MSP komandaları üçün giriş nöqtəsi.
+        Telegramdan gələn bütün MSP *mətn* komandaları üçün giriş nöqtəsi.
 
         Nümunələr:
           - msp: market: pet hair remover | US
@@ -86,6 +133,7 @@ class MSP:
           - msp: ds05: product page yaz
           - msp: life01: sağlamlıq planı ver
           - msp: sys01: bilik bazasını izah et
+          - msp: tga: start   (TikTok Growth Agent-i işə salmaq üçün)
         """
         if not raw_text:
             return "MSP error: boş mesaj gəldi."
@@ -234,6 +282,25 @@ class MSP:
                 )
 
         # ==========================================================
+        # 4.5) TGA – TikTok Growth Agent tekst trigger-i
+        # ----------------------------------------------------------
+        # Sadə idarəetmə üçün:
+        #   msp: tga: start
+        #   msp: tiktok: start
+        # TGA-nın günlük cycle-ını işə salır və preview-ları hazır edir.
+        # ==========================================================
+        if lowered.startswith("tga:") or lowered.startswith("tiktok:"):
+            # Məzmunu hələ istifadə etməsək də gələcəkdə action-lara görə ayıra bilərik
+            # Məs: "tga: preview", "tga: rerun" və s.
+            self.tga.run_daily_cycle()
+            return (
+                "TGA — TikTok Growth Agent işə salındı.\n"
+                "Bu gün üçün video draftları planlaşdırıldı və stub preview-lar hazırlandı.\n"
+                "Telegram bot layer: MSP.build_tga_preview_payloads() çağıraraq həmin preview-ları "
+                "Zahid Brat-a göndərə bilər. 📹"
+            )
+
+        # ==========================================================
         # 5) TANINMAYAN KOMANDA
         # ==========================================================
         return (
@@ -245,4 +312,5 @@ class MSP:
             "  • msp: ds05: product page copy yaz pet hair remover üçün\n"
             "  • msp: life01: sağlamlıq və vərdiş planı ver\n"
             "  • msp: sys01: sistem bilik bazası haqqında izah et\n"
+            "  • msp: tga: start  (TikTok Growth Agent günlük cycle)\n"
             )
