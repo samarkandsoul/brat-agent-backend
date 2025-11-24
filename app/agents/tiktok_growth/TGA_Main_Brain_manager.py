@@ -6,7 +6,7 @@ import datetime
 
 from .trend_brain import TrendBrain
 from .video_lab import VideoLab, VideoRenderResult
-
+from .tiktok_api_client import TikTokApiClient
 
 @dataclass
 class TGAVideoDraft:
