@@ -1,51 +1,52 @@
+# app/agents/core/msp.py
+
 from typing import Tuple
-import importlib
 
 
 class MSP:
     """
-    MSP (Main Service Processor)
-    'msp: ...' tipli komandaları uyğun agenta yönləndirən router.
+    MSP (Main Service Processor) - Samarkand Soul botunun əsas router-i.
+    'msp: ...' tipli komandaları oxuyub uyğun agenta yönləndirir.
     """
 
     def __init__(self) -> None:
-        # DS, LIFE və SYS agent xəritələri
-        self.ds_agents = {
-            "ds02": ("app.agents.ds.ds02_drive_agent", "DS02DriveAgent"),
-            "ds03": ("app.agents.ds.ds03_shopify_agent", "DS03ShopifyAgent"),
-            "ds04": ("app.agents.ds.ds04_offer_pricing", "DS04OfferPricingAgent"),
-            "ds05": ("app.agents.ds.ds05_product_page_copywriter", "DS05ProductPageCopywriter"),
-            "ds06": ("app.agents.ds.ds06_creative_scriptwriter", "DS06CreativeScriptwriterAgent"),
-            "ds07": ("app.agents.ds.ds07_ad_angles_hooks_master", "DS07AdAnglesHooksMasterAgent"),
-            "ds08": ("app.agents.ds.ds08_image_visual_brief_creator", "DS08ImageVisualBriefCreatorAgent"),
-            "ds09": ("app.agents.ds.ds09_store_structure_planner", "DS09StoreStructurePlannerAgent"),
-            "ds10": ("app.agents.ds.ds10_checkout_funnel_optimizer", "DS10CheckoutFunnelOptimizerAgent"),
-            "ds11": ("app.agents.ds.ds11_email_sms_flows_planner", "DS11EmailSMSFlowsPlannerAgent"),
-            "ds12": ("app.agents.ds.ds12_kpi_analytics_analyst", "DS12KPIAnalyticsAnalystAgent"),
-            "ds13": ("app.agents.ds.ds13_meta_ads_strategist", "DS13MetaAdsStrategistAgent"),
-            "ds14": ("app.agents.ds.ds14_tiktok_ads_strategist", "DS14TiktokAdsStrategistAgent"),
-            "ds15": ("app.agents.ds.ds15_influencer_ugc_strategist", "DS15InfluencerUGCStrategistAgent"),
-            "ds16": ("app.agents.ds.ds16_customer_support_playbook_writer", "DS16CustomerSupportPlaybookWriterAgent"),
-            "ds17": ("app.agents.ds.ds17_policy_risk_guard", "DS17PolicyRiskGuardAgent"),
-            "ds18": ("app.agents.ds.ds18_supplier_logistics_planner", "DS18SupplierLogisticsPlannerAgent"),
-            "ds19": ("app.agents.ds.ds19_scale_exit_strategist", "DS19ScaleExitStrategistAgent"),
-            "ds20": ("app.agents.ds.ds20_experiments_ab_testing_lab", "DS20ExperimentsABTestingLabAgent"),
+        # DS, LIFE və SYS agent label xəritələri (DEMO cavab üçün)
+        self.ds_labels = {
+            "ds02": "DRIVE-AGENT",
+            "ds03": "SHOPIFY-AGENT",
+            "ds04": "OFFER & PRICING-STRATEGIST",
+            "ds05": "PRODUCT-PAGE-COPYWRITER",
+            "ds06": "CREATIVE-SCRIPTWRITER",
+            "ds07": "AD ANGLES & HOOKS-MASTER",
+            "ds08": "IMAGE & VISUAL-BRIEF-CREATOR",
+            "ds09": "STORE-STRUCTURE-PLANNER",
+            "ds10": "CHECKOUT & FUNNEL-OPTIMIZER",
+            "ds11": "EMAIL & SMS-FLOWS-PLANNER",
+            "ds12": "KPI & ANALYTICS-ANALYST",
+            "ds13": "META-ADS-STRATEGIST",
+            "ds14": "TIKTOK-ADS-STRATEGIST",
+            "ds15": "INFLUENCER & UGC STRATEGIST",
+            "ds16": "CUSTOMER-SUPPORT-PLAYBOOK-WRITER",
+            "ds17": "POLICY & RISK-GUARD",
+            "ds18": "SUPPLIER & LOGISTICS-PLANNER",
+            "ds19": "SCALE & EXIT-STRATEGIST",
+            "ds20": "EXPERIMENTS & A/B TESTING LAB",
         }
 
-        self.life_agents = {
-            "life01": ("app.agents.life.life01_health_habit_coach", "LIFE01HealthHabitCoachAgent"),
-            "life02": ("app.agents.life.life02_nutrition_meal_planner", "LIFE02NutritionMealPlannerAgent"),
-            "life03": ("app.agents.life.life03_fitness_training_coach", "LIFE03FitnessTrainingCoachAgent"),
-            "life04": ("app.agents.life.life04_calendar_time_architect", "LIFE04CalendarTimeArchitectAgent"),
-            "life05": ("app.agents.life.life05_info_news_curator", "LIFE05InfoNewsCuratorAgent"),
+        self.life_labels = {
+            "life01": "HEALTH & HABIT-COACH",
+            "life02": "NUTRITION & MEAL PLANNER",
+            "life03": "FITNESS & TRAINING COACH",
+            "life04": "CALENDAR & TIME ARCHITECT",
+            "life05": "INFO & NEWS CURATOR",
         }
 
-        self.sys_agents = {
-            "sys01": ("app.agents.sys.sys01_knowledge_librarian", "SYS01KnowledgeLibrarianAgent"),
-            "sys02": ("app.agents.sys.sys02_security_privacy_guardian", "SYS02SecurityPrivacyGuardianAgent"),
-            "sys03": ("app.agents.sys.sys03_process_sop_builder", "SYS03ProcessSOPBuilderAgent"),
-            "sys04": ("app.agents.sys.sys04_system_health_refactor_planner", "SYS04SystemHealthRefactorPlannerAgent"),
-            "sys05": ("app.agents.sys.sys05_future_roadmap_innovation_planner", "SYS05FutureRoadmapInnovationPlannerAgent"),
+        self.sys_labels = {
+            "sys01": "KNOWLEDGE-LIBRARIAN",
+            "sys02": "SECURITY & PRIVACY-GUARDIAN",
+            "sys03": "PROCESS & SOP BUILDER",
+            "sys04": "SYSTEM HEALTH & REFACTOR PLANNER",
+            "sys05": "FUTURE-ROADMAP & INNOVATION-PLANNER",
         }
 
     # =========================
@@ -53,6 +54,9 @@ class MSP:
     # =========================
     @staticmethod
     def _strip_msp_prefix(raw_text: str) -> str:
+        """
+        'msp:' prefiksini kəsir və baş/son boşluqları təmizləyir.
+        """
         text = (raw_text or "").strip()
         if text.lower().startswith("msp:"):
             return text[4:].strip()
@@ -60,28 +64,25 @@ class MSP:
 
     @staticmethod
     def _split_once(body: str, sep: str = "|") -> Tuple[str, str]:
+        """
+        'a | b' formatını iki hissəyə bölən helper.
+        """
         parts = [p.strip() for p in body.split(sep, 1)]
         if len(parts) == 1:
             return parts[0], ""
         return parts[0], parts[1]
-
-    def _call_agent(self, module_path: str, class_name: str, query: str, label: str) -> str:
-        try:
-            module = importlib.import_module(module_path)
-            cls = getattr(module, class_name)
-            agent = cls()
-            return agent.run(query)
-        except Exception as e:
-            return f"MSP error ({label}): {e}"
 
     # =========================
     #  Main entrypoint
     # =========================
     def process(self, raw_text: str) -> str:
         """
-        Telegramdan gələn bütün MSP komandaları üçün giriş.
+        Telegramdan gələn bütün MSP komandaları üçün giriş nöqtəsi.
+
         Nümunələr:
           - msp: market: pet hair remover | US
+          - msp: offer: pet hair remover üçün ideal qiymət və bundle ideyaları | US market
+          - msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master
           - msp: ds05: product page yaz
           - msp: life01: sağlamlıq planı ver
           - msp: sys01: bilik bazasını izah et
@@ -95,9 +96,13 @@ class MSP:
 
         lowered = text.lower()
 
+        # ==========================================================
+        # 1) DS-01 MARKET RESEARCH (real modul)
         # ----------------------------------------------------------
-        #  DS-01 — MARKET (xüsusi format)
-        # ----------------------------------------------------------
+        # Format:
+        #   msp: market: Niche | Country
+        #   msp: ds01: Niche | Country
+        # ==========================================================
         if lowered.startswith("market:") or lowered.startswith("ds01:"):
             if lowered.startswith("market:"):
                 body = text[len("market:"):].strip()
@@ -107,7 +112,8 @@ class MSP:
             if not body:
                 return (
                     "MSP error: Market komandasının gövdəsi boşdur.\n"
-                    "Format: msp: market: Niche | Country"
+                    "Düzgün format: msp: market: Niche | Country\n"
+                    "Məsələn: msp: market: pet hair remover | US"
                 )
 
             niche, country = self._split_once(body, "|")
@@ -115,71 +121,127 @@ class MSP:
                 country = "US"
 
             if not niche:
-                return "MSP error: Niche boş ola bilməz."
+                return (
+                    "MSP error: Niche boş ola bilməz.\n"
+                    "Nümunə: msp: market: pet hair remover | US"
+                )
 
             try:
                 from app.agents.ds.ds01_market_research import (
                     analyze_market,
                     MarketResearchRequest,
                 )
-            except Exception as e:
-                return f"MSP error: DS-01 modul import xətası: {e}"
+            except Exception as e:  # pylint: disable=broad-except
+                return f"MSP error: DS-01 modulunu import edə bilmədim: {e}"
 
             try:
                 req = MarketResearchRequest(niche=niche, country=country)
                 result = analyze_market(req)
-                return f"DS-01 Market Research nəticəsi:\n{result}"
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 return f"MSP error: DS-01 işləmə xətası: {e}"
 
+            return f"DS-01 Market Research nəticəsi:\n{result}"
+
+        # ==========================================================
+        # 2) DS-04 OFFER & PRICING (stub, həm 'offer:', həm də 'ds04:')
+        # ==========================================================
+        if lowered.startswith("offer:") or lowered.startswith("ds04:"):
+            if lowered.startswith("offer:"):
+                body = text[len("offer:"):].strip()
+            else:
+                body = text[len("ds04:"):].strip()
+
+            if not body:
+                return (
+                    "MSP error: Offer komandasının gövdəsi boşdur.\n"
+                    "Format: msp: offer: Məhsul üçün qiymət və bundle ideyaları | Market"
+                )
+
+            product, market = self._split_once(body, "|")
+            product = product or "Naməlum məhsul"
+            market = market or "Naməlum market"
+
+            return (
+                "DS-04 Offer & Pricing Strategist (DEMO):\n"
+                f"Məhsul: {product}\n"
+                f"Market: {market}\n\n"
+                "Burada normalda ideal qiymət diapazonu, bundle təklifləri və upsell ideyaları generasiya "
+                "olunacaq. Hazırda struktur testi gedir. 💡"
+            )
+
+        # ==========================================================
+        # 3) DRIVE DEMO
         # ----------------------------------------------------------
-        #  DRIVE DEMO
-        # ----------------------------------------------------------
+        # msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master
+        # ==========================================================
         if lowered.startswith("drive:"):
             path = text[len("drive:"):].strip()
             if not path:
-                return "MSP error: drive path boşdur."
+                return (
+                    "MSP error: drive path boşdur.\n"
+                    "Nümunə: msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master"
+                )
 
             return (
                 "Drive DEMO cavabı:\n"
-                f"- Path: {path}\n\n"
-                "Burada normalda Google Drive qovluq strukturu yaradılacaq."
+                "Bu path üçün qovluq strukturu yaradılmalı idi:\n"
+                f"{path}\n"
+                "Google Drive real inteqrasiyasını ayrıca test edib qoşacağıq. 🎛️"
             )
 
+        # ==========================================================
+        # 4) GENERIC DS / LIFE / SYS KOMANDALARI
         # ----------------------------------------------------------
-        #  GENERIC DS / LIFE / SYS komanda forması
-        #  Formatlar:
-        #    msp: ds05: ...
-        #    msp: life01: ...
-        #    msp: sys01: ...
-        # ----------------------------------------------------------
+        # Formatlar:
+        #   msp: ds05: ...
+        #   msp: life01: ...
+        #   msp: sys01: ...
+        # Bu mərhələdə hamısı STUB / DEMO cavab qaytarır.
+        # ==========================================================
         if ":" in text:
             prefix, _, body = text.partition(":")
             key = prefix.strip().lower()
-            query = body.strip()
+            query = body.strip() or "(boş sorğu)"
 
-            # DS
-            if key in self.ds_agents:
-                module_path, class_name = self.ds_agents[key]
-                return self._call_agent(module_path, class_name, query, key)
+            # ----- DS agentləri -----
+            if key in self.ds_labels:
+                label = self.ds_labels[key]
+                return (
+                    f"{key.upper()} — {label} (DEMO):\n"
+                    f"Input: {query}\n\n"
+                    "Bu agent hazırda struktur testi üçün stub cavab qaytarır. "
+                    "Gələcəkdə burada real LLM + inteqrasiyalar işləyəcək. 🧠"
+                )
 
-            # LIFE
-            if key in self.life_agents:
-                module_path, class_name = self.life_agents[key]
-                return self._call_agent(module_path, class_name, query, key)
+            # ----- LIFE agentləri -----
+            if key in self.life_labels:
+                label = self.life_labels[key]
+                return (
+                    f"{key.upper()} — {label} (DEMO):\n"
+                    f"Input: {query}\n\n"
+                    "Bu LIFE agenti hazırda demo rejimindədir. Gələcəkdə şəxsi planlar və tövsiyələr "
+                    "buradan generasiya olunacaq."
+                )
 
-            # SYS
-            if key in self.sys_agents:
-                module_path, class_name = self.sys_agents[key]
-                return self._call_agent(module_path, class_name, query, key)
+            # ----- SYS agentləri -----
+            if key in self.sys_labels:
+                label = self.sys_labels[key]
+                return (
+                    f"{key.upper()} — {label} (DEMO):\n"
+                    f"Input: {query}\n\n"
+                    "Bu SYS agenti hazırda struktur testindədir. Sistem bilikləri və idarəetmə "
+                    "planları buradan idarə olunacaq."
+                )
 
-        # ----------------------------------------------------------
-        #  UNKNOWN
-        # ----------------------------------------------------------
+        # ==========================================================
+        # 5) TANINMAYAN KOMANDA
+        # ==========================================================
         return (
-            "MSP error: bu MSP komandasını tanımadım.\n"
-            "Nümunələr:\n"
+            "MSP error: Bu MSP komandasını tanımadım.\n"
+            "Mümkün nümunələr:\n"
             "  • msp: market: pet hair remover | US\n"
+            "  • msp: offer: pet hair remover üçün ideal qiymət və bundle ideyaları | US market\n"
+            "  • msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master\n"
             "  • msp: ds05: product page copy yaz pet hair remover üçün\n"
             "  • msp: life01: sağlamlıq və vərdiş planı ver\n"
             "  • msp: sys01: sistem bilik bazası haqqında izah et\n"
