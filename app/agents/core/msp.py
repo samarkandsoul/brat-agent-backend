@@ -95,7 +95,7 @@ class MSP:
         """
         Telegram callback_data üçün router.
 
-        Hal-hazırda yalnız TGA için callback-lər:
+        Hal-hazırda yalnız TGA üçün callback-lər:
           - tga_approve:<draft_id>
           - tga_reject:<draft_id>
         """
@@ -218,6 +218,53 @@ class MSP:
             )
 
         # ==========================================================
+        # 3.5) SHOPIFY AGENT (DS03) — real API integration
+        # ----------------------------------------------------------
+        # Nümunələr:
+        #   msp: shopify: test
+        #   msp: shopify: demo
+        #   msp: shopify: comingsoon
+        # ==========================================================
+        if lowered.startswith("shopify:"):
+            body = text[len("shopify:"):].strip().lower()
+
+            try:
+                from app.agents.ds.ds03_shopify_agent import (
+                    test_shopify_connection,
+                    create_demo_product,
+                    setup_coming_soon_page,
+                    ShopifyDemoProductSpec,
+                )
+            except Exception as e:  # pylint: disable=broad-except
+                return f"MSP error: DS03 Shopify agent import failed: {e}"
+
+            if body.startswith("test"):
+                return test_shopify_connection()
+
+            if body.startswith("demo"):
+                spec = ShopifyDemoProductSpec(
+                    title="Samarkand Soul Demo Tablecloth",
+                    description="""
+                        <p>This is a demo product created by the Samarkand Soul DS03 Shopify Agent.</p>
+                        <p>Premium home textile, inspired by the soul of Samarkand.</p>
+                    """,
+                    price="39.90",
+                    tags=["samarkand soul", "demo", "tablecloth"],
+                    image_url=None,  # optional: you can paste an image URL here
+                )
+                return create_demo_product(spec)
+
+            if body.startswith("comingsoon"):
+                return setup_coming_soon_page()
+
+            return (
+                "Shopify agent commands:\n"
+                "  • msp: shopify: test        → check Shopify connection\n"
+                "  • msp: shopify: demo        → create demo product (draft)\n"
+                "  • msp: shopify: comingsoon  → create/update 'coming soon' page\n"
+            )
+
+        # ==========================================================
         # 4) GENERIC DS / LIFE / SYS KOMANDALARI
         # ==========================================================
         if ":" in text:
@@ -275,5 +322,6 @@ class MSP:
             "  • msp: ds05: product page copy yaz pet hair remover üçün\n"
             "  • msp: life01: sağlamlıq və vərdiş planı ver\n"
             "  • msp: sys01: sistem bilik bazası haqqında izah et\n"
+            "  • msp: shopify: test / demo / comingsoon\n"
             "  • msp: tga: start  (TikTok Growth Agent günlük cycle)\n"
         )
