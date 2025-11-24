@@ -1,41 +1,67 @@
 # app/llm/brat_gpt.py
 
 import os
-from openai import OpenAI
+from typing import Optional
 
-# OPENAI_API_KEY mühit dəyişənindən oxunur
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-
-
-SYSTEM_PROMPT = """
-You are GPT Brat, an AI mentor and co-founder for Zahid Brat.
-- Speak in the same language as the user (Azerbaijani or Turkish or English).
-- Be clear, practical and friendly.
-- Explain technical things step by step, but without walls of text.
-- If you don't know something or have no access (like hidden logs, local files), say it honestly.
-- Help with coding, system design, business strategy, and debugging.
-"""
+try:
+    from openai import OpenAI
+except ImportError:
+    OpenAI = None  # library yoxdursa, error mesajı verəcəyik
 
 
-def brat_gpt_chat(user_message: str) -> str:
+_client: Optional["OpenAI"] = None
+
+
+def _get_client() -> Optional["OpenAI"]:
     """
-    Sadə wrapper: bir mesaj alır, bir cavab qaytarır.
-    Hələlik yaddaş saxlamırıq, sonra əlavə edərik.
+    OpenAI client-i tək nüsxə kimi yaradır.
+    OPENAI_API_KEY yoxdursa, None qaytarır.
     """
+    global _client
 
-    if not client.api_key:
-        return "BratGPT error: OPENAI_API_KEY serverdə qurulmayıb."
+    if _client is not None:
+        return _client
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        return None
+
+    if OpenAI is None:
+        # Kitabxana quraşdırılmayıb
+        return None
+
+    _client = OpenAI(api_key=api_key)
+    return _client
+
+
+def simple_chat(
+    system_prompt: str,
+    user_prompt: str,
+    model: str = "gpt-4o-mini",
+    temperature: float = 0.7,
+) -> str:
+    """
+    Sadə chat helper.
+    OPENAI_API_KEY və ya openai kitabxanası yoxdursa, aydın error mətnı qaytarır.
+    """
+    client = _get_client()
+    if client is None:
+        return (
+            "DS-01 info: OPENAI_API_KEY və ya OpenAI kitabxanası tapılmadı. "
+            "Hazırda DS-01 DEMO rejimindədir. 🔌"
+        )
 
     try:
-        response = client.chat.completions.create(
-            model="gpt-4.1-mini",
+        # Yeni OpenAI clientində klassik chat.completions interfeysi hələ də dəstəklənir.
+        resp = client.chat.completions.create(
+            model=model,
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_message},
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
             ],
-            temperature=0.4,
+            temperature=temperature,
         )
-        return response.choices[0].message.content
-    except Exception as e:
-        # Burda xəta olsa, heç olmasa izah edək
-        return f"BratGPT LLM error: {e}"
+        content = resp.choices[0].message.content or ""
+        return content.strip()
+    except Exception as e:  # pylint: disable=broad-except
+        return f"DS-01 OpenAI xətası: {e}"
