@@ -16,6 +16,7 @@ class MSP:
         Nümunələr:
           - 'msp: market: pet hair remover | US'
           - 'msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master'
+          - 'msp: offer: premium blanket | US market'
         """
 
         if not raw_text:
@@ -51,61 +52,4 @@ class MSP:
             except Exception as e:
                 return f"MSP error: DriveAgent import xətası: {e}"
 
-            # 2) Agent obyektinin yaradılmasını ayrıca yoxlayaq
-            try:
-                agent = DriveAgent()
-            except Exception as e:
-                return f"MSP error: DriveAgent init xətası: {e}"
-
-            # 3) Qovluq path-i yaratmağı ayrıca yoxlayaq
-            try:
-                result = agent.create_folder_path(path)
-                return result
-            except Exception as e:
-                return f"MSP error: DriveAgent create_folder_path xətası: {e}"
-
-        # ==========================================================
-        # 2) DS-01 MARKET RESEARCH DEMO
-        # ----------------------------------------------------------
-        # Nümunə:
-        #   msp: market: pet hair remover | US
-        # Format:
-        #   market: Niche | Country
-        # ==========================================================
-        if text.lower().startswith("market:"):
-            body = text[len("market:"):].strip()
-
-            try:
-                niche, country = [p.strip() for p in body.split("|", 1)]
-            except ValueError:
-                return (
-                    "MSP error: Market komandasının formatı yanlışdır.\n"
-                    "Düzgün format: msp: market: Niche | Country\n"
-                    "Məsələn: msp: market: pet hair remover | US"
-                )
-
-            if not niche or not country:
-                return (
-                    "MSP error: Niche və Country boş ola bilməz.\n"
-                    "Nümunə: msp: market: pet hair remover | US"
-                )
-
-            return (
-                "DS-01 Market Research nəticəsi:\n"
-                "DS-01 demo rejimindədir.\n"
-                f"Niche: {niche}\n"
-                f"Country: {country}\n\n"
-                "Real market analizi OpenAI balansı aktiv olandan sonra qoşulacaq. "
-                "Hal-hazırda yalnız komanda strukturunu test edirik. 🧠"
-            )
-
-        # ==========================================================
-        # 3) TANINMAYAN KOMANDA
-        # ==========================================================
-        return (
-            "MSP error: Bu MSP komandasını tanımadım.\n"
-            "Mümkün nümunələr:\n"
-            "  • msp: market: pet hair remover | US\n"
-            "  • msp: drive: SamarkandSoulSystem / DS System / "
-            "DS-01 - Market-Research-Master"
-                )
+            # 2
