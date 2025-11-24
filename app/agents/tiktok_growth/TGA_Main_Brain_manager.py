@@ -190,6 +190,32 @@ class TikTokGrowthAgent:
 
         return payloads
 
+    def get_text_preview_summary(self) -> str:
+        """
+        Bugünkü video draftları üçün sadə mətn formatlı overview qaytarır.
+        Telegram bot bunu bir mesaj kimi göndərə bilər.
+        """
+        if not self.video_queue:
+            return (
+                "TGA: Bu gün üçün hələ heç bir video draftı hazırlanmayıb.\n"
+                "Əvvəlcə:  msp: tga: start  yaz və daily cycle-i işə sal. 📹"
+            )
+
+        lines = ["📹 *TGA — Bugünkü TikTok video draftları:*", ""]
+
+        for idx, draft in enumerate(self.video_queue, start=1):
+            render_meta = draft.meta.get("render", {})
+            preview_note = render_meta.get("preview_note", "")
+
+            lines.append(
+                f"*{idx})* ID: `{draft.id}`\n"
+                f"   *Title:* {draft.title}\n"
+                f"   *Status:* {draft.status}\n"
+                f"   *Preview:* {preview_note}"
+            )
+
+        return "\n\n".join(lines)
+
     # ===== HELPER METHODS =====
 
     def _find_draft(self, draft_id: str) -> Optional[TGAVideoDraft]:
