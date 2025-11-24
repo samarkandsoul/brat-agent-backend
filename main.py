@@ -5,7 +5,7 @@ import requests
 
 from app.agents.ds.ds01_market_research import analyze_market, MarketResearchRequest
 from app.agents.core.msp import MSP
-from app.llm.brat_gpt import brat_gpt_chat  # ✅ BRAT GPT dialoq agenti
+from app.llm.brat_gpt import brat_gpt_chat  # GPT Brat ekizi
 
 app = FastAPI(title="BRAT Backend")
 
@@ -67,11 +67,11 @@ def send_telegram_message(chat_id: int, text: str):
 def handle_telegram_command(chat_id: int, text: str):
     """
     Burada əsas agent loqikasıdır.
-    Hal-hazırda:
+
       - /start    -> kömək mesajı
-      - msp: ...  -> MSP core (router)
-      - market:   -> DS-01 market research
-      - digərləri -> Brat GPT dialoq rejimi
+      - msp: ...  -> MSP core (router, DS-01, DS-02 və s.)
+      - market:   -> DS-01 market research (birbaşa)
+      - digərləri -> Brat GPT dialoq rejimi (GPT Brat ekizi)
     """
     lower = text.strip().lower()
 
@@ -84,7 +84,9 @@ def handle_telegram_command(chat_id: int, text: str):
             "*Market araşdırması (DS-01):*\n"
             "`market: Niche | Country`\n\n"
             "Məsələn:\n"
-            "`market: pet hair remover | US`"
+            "`market: pet hair remover | US`\n\n"
+            "*Brat GPT dialoq:*\n"
+            "Adi sualını yaz, mən sənin GPT Brat ekizin kimi cavab verim. 🧠"
         )
         send_telegram_message(chat_id, msg)
         return
@@ -155,23 +157,11 @@ def handle_telegram_command(chat_id: int, text: str):
 
     # 4) Brat GPT dialoq rejimi — qalan bütün mesajlar üçün
     try:
-        reply = brat_gpt_chat(str(chat_id), text)
+        reply = brat_gpt_chat(text)
         send_telegram_message(chat_id, reply)
         return
     except Exception as e:
-        # Əgər GPT tərəfdə problem olsa, ən azı kömək mesajı verək
-        print("Brat GPT error:", e)
-        msg = (
-            "Bu komandaları anlayıram:\n\n"
-            "*MSP test:*\n"
-            "`msp: hər hansı komanda`\n\n"
-            "*Market araşdırması (DS-01):*\n"
-            "`market: Niche | Country`\n"
-            "Məsələn:\n"
-            "`market: gaming chairs | US`\n\n"
-            "Və ya sadəcə normal danış, mən sənin Brat GPT köməkçin kimi cavab verim. 🧠"
-        )
-        send_telegram_message(chat_id, msg)
+        send_telegram_message(chat_id, f"BratGPT error: {e}")
         return
 
 
