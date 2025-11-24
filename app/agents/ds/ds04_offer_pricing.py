@@ -2,26 +2,21 @@
 
 class OfferPricingAgent:
     """
-    DS-04 — OFFER & PRICING-STRATEGIST
-
-    Hazırda DEMO rejimindədir.
-    Sonra buraya real qiymət strategiyası, bundle, upsell və s. loqika əlavə edəcəyik.
+    DS-04 — Offer & Pricing Strategist
+    DEMO versiya: real OpenAI balansı gələnə qədər sadə cavab qaytarır.
     """
 
-    def process(self, query: str) -> str:
-        query = query.strip()
+    def __init__(self):
+        pass
 
-        if not query:
-            return (
-                "DS-04 error: boş sorğu gəldi.\n"
-                "Nümunə komanda:\n"
-                "  msp: offer: premium blanket | US market\n"
-            )
+    def process(self, text: str) -> str:
+        if not text:
+            return "DS-04 error: boş sual göndərilib."
 
         return (
-            "DS-04 — Offer & Pricing Strategist DEMO cavabı:\n"
-            f"Verilən sorğu: {query}\n\n"
-            "Hazırda demo rejimindədir. Burada məhsul üçün qiymət strategiyası, "
-            "bundling, upsell və digər monetizasiya ideyalarını hesablamaq üçün "
-            "əlavə modullar qoşulacaq. 💸"
-      )
+            "DS-04 Offer & Pricing Strategist (DEMO)\n"
+            "Məhsul üçün ilkin offer analizi:\n\n"
+            f"📌 Giriş: {text}\n\n"
+            "✨ Bu agent real OpenAI analitikasına qoşulanda tam qiymət, bundle, upsell və offer strukturunu çıxaracaq.\n"
+            "Hazırda DEMO cavab qaytarılır."
+        )
