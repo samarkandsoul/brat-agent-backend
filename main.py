@@ -5,7 +5,6 @@ import requests
 
 from app.agents.ds.ds01_market_research import analyze_market, MarketResearchRequest
 from app.agents.core.msp import MSP
-from app.llm.brat_gpt import brat_gpt_chat  # GPT Brat ekizi
 
 app = FastAPI(title="BRAT Backend")
 
