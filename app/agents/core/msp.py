@@ -4,17 +4,17 @@ from typing import Tuple, List, Dict, Any, Optional
 
 from app.agents.tiktok_growth.TGA_Main_Brain_manager import TikTokGrowthAgent
 from app.agents.ds.ds02_drive_agent import DriveAgent  # DS-02 Drive Agent
-from app.mamos.mamos_loader import MAMOSLoader  # 🔹 MAMOS Unified Brain Loader
+from app.mamos.mamos_loader import MAMOSLoader  # MAMOS Unified Brain Loader
 
 
 class MSP:
     """
-    MSP (Main Service Processor) - Samarkand Soul botunun əsas router-i.
-    'msp: ...' tipli komandaları oxuyub uyğun agenta yönləndirir.
+    MSP (Main Service Processor) - main router of the Samarkand Soul bot.
+    It reads commands starting with 'msp:' and routes them to the correct agent.
     """
 
     def __init__(self) -> None:
-        # DS, LIFE və SYS agent label xəritələri (DEMO cavab üçün)
+        # DS, LIFE and SYS agent label maps (for DEMO responses)
         self.ds_labels = {
             "ds02": "DRIVE-AGENT",
             "ds03": "SHOPIFY-AGENT",
@@ -53,10 +53,10 @@ class MSP:
             "sys05": "FUTURE-ROADMAP & INNOVATION-PLANNER",
         }
 
-        # DS-02 Drive Agent – qovluq blueprint-ləri üçün
+        # DS-02 Drive Agent – for Google Drive / folder blueprints
         self.drive = DriveAgent()
 
-        # TikTok Growth Agent (TGA) – TikTok kontent fabriki
+        # TikTok Growth Agent (TGA) – TikTok content factory
         self.tga = TikTokGrowthAgent()
 
     # =========================
@@ -65,18 +65,18 @@ class MSP:
     def load_mamos(self) -> str:
         """
         Load the global MAMOS doctrine.
-        Bütün agentlər Samarkand Soul missiyasını, qaydalarını
-        və nizam-intizamı bu sənəddən anlayırlar.
+        All agents use this to understand the Samarkand Soul mission,
+        rules and discipline.
         """
         return MAMOSLoader.load_mamos()
 
     # =========================
-    #  Helper-lər
+    #  Helpers
     # =========================
     @staticmethod
     def _strip_msp_prefix(raw_text: str) -> str:
         """
-        'msp:' prefiksini kəsir və baş/son boşluqları təmizləyir.
+        Removes the 'msp:' prefix and trims leading / trailing spaces.
         """
         text = (raw_text or "").strip()
         if text.lower().startswith("msp:"):
@@ -86,7 +86,7 @@ class MSP:
     @staticmethod
     def _split_once(body: str, sep: str = "|") -> Tuple[str, str]:
         """
-        'a | b' formatını iki hissəyə bölən helper.
+        Splits 'a | b' into two parts with a single separator.
         """
         parts = [p.strip() for p in body.split(sep, 1)]
         if len(parts) == 1:
@@ -94,13 +94,13 @@ class MSP:
         return parts[0], parts[1]
 
     # =========================
-    #  TGA – TikTok Growth Agent helper-ləri
+    #  TGA – TikTok Growth Agent helpers
     # =========================
     def build_tga_preview_payloads(self) -> List[Dict[str, Any]]:
         """
-        TikTok Growth Agent üçün Telegram-a uyğun preview payload-larını qaytarır.
+        Returns Telegram-ready preview payloads for the TikTok Growth Agent.
 
-        MSP-dən kənardakı bot layer bunu belə istifadə edə bilər:
+        Example usage from the outer bot layer:
             payloads = msp.build_tga_preview_payloads()
             for p in payloads:
                 bot.send_message(chat_id, **p)
@@ -109,9 +109,9 @@ class MSP:
 
     def process_callback(self, callback_data: str) -> Optional[str]:
         """
-        Telegram callback_data üçün router.
+        Router for Telegram callback_data.
 
-        Hal-hazırda yalnız TGA üçün callback-lər:
+        Currently only supports TGA callbacks:
           - tga_approve:<draft_id>
           - tga_reject:<draft_id>
         """
@@ -121,33 +121,42 @@ class MSP:
         if callback_data.startswith("tga_approve:"):
             draft_id = callback_data.split(":", 1)[1]
             self.tga.handle_telegram_approval(draft_id, approved=True)
-            return "✅ Video təsdiqləndi. Posting üçün növbəyə əlavə olundu."
+            return "✅ Video approved. Added to the posting queue."
 
         if callback_data.startswith("tga_reject:"):
             draft_id = callback_data.split(":", 1)[1]
             self.tga.handle_telegram_approval(draft_id, approved=False)
-            return "❌ Video rədd edildi. Yeni variant generasiya olunacaq."
+            return "❌ Video rejected. A new version will be generated."
 
-        return None  # Başqa callback tipləri üçün
+        return None  # other callback types
 
     # =========================
-    #  Main entrypoint (text mesajlar)
+    #  Main entrypoint (text messages)
     # =========================
     def process(self, raw_text: str) -> str:
         """
-        Telegramdan gələn bütün MSP *mətn* komandaları üçün giriş nöqtəsi.
+        Main entrypoint for all MSP *text* commands coming from Telegram.
         """
         if not raw_text:
-            return "MSP error: boş mesaj gəldi."
+            return "MSP error: empty message."
 
         text = self._strip_msp_prefix(raw_text)
         if not text:
-            return "MSP error: boş MSP komandası."
+            return "MSP error: empty MSP command."
 
         lowered = text.lower()
 
+        # ==========================================
+        # 0) MAMOS – show global doctrine
+        # ==========================================
+        if lowered.startswith("mamos"):
+            doc = self.load_mamos()
+            # Telegram has limits – send only a preview
+            preview = doc[:3500]
+            return "📜 MAMOS — Samarkand Soul Doctrine (preview):\n\n" + preview
+
         # ==========================================================
-        # 1) DS-01 MARKET RESEARCH (real modul)
+        # 1) DS-01 MARKET RESEARCH (real module)
         # ==========================================================
         if lowered.startswith("market:") or lowered.startswith("ds01:"):
             if lowered.startswith("market:"):
@@ -157,9 +166,9 @@ class MSP:
 
             if not body:
                 return (
-                    "MSP error: Market komandasının gövdəsi boşdur.\n"
-                    "Düzgün format: msp: market: Niche | Country\n"
-                    "Məsələn: msp: market: pet hair remover | US"
+                    "MSP error: Market command body is empty.\n"
+                    "Correct format: msp: market: Niche | Country\n"
+                    "Example: msp: market: pet hair remover | US"
                 )
 
             niche, country = self._split_once(body, "|")
@@ -168,8 +177,8 @@ class MSP:
 
             if not niche:
                 return (
-                    "MSP error: Niche boş ola bilməz.\n"
-                    "Nümunə: msp: market: pet hair remover | US"
+                    "MSP error: Niche cannot be empty.\n"
+                    "Example: msp: market: pet hair remover | US"
                 )
 
             try:
@@ -178,15 +187,15 @@ class MSP:
                     MarketResearchRequest,
                 )
             except Exception as e:  # pylint: disable=broad-except
-                return f"MSP error: DS-01 modulunu import edə bilmədim: {e}"
+                return f"MSP error: could not import DS-01 module: {e}"
 
             try:
                 req = MarketResearchRequest(niche=niche, country=country)
                 result = analyze_market(req)
             except Exception as e:  # pylint: disable=broad-except
-                return f"MSP error: DS-01 işləmə xətası: {e}"
+                return f"MSP error: DS-01 processing error: {e}"
 
-            return f"DS-01 Market Research nəticəsi:\n{result}"
+            return f"DS-01 Market Research result:\n{result}"
 
         # ==========================================================
         # 2) DS-04 OFFER & PRICING (stub)
@@ -199,27 +208,27 @@ class MSP:
 
             if not body:
                 return (
-                    "MSP error: Offer komandasının gövdəsi boşdur.\n"
-                    "Format: msp: offer: Məhsul üçün qiymət və bundle ideyaları | Market"
+                    "MSP error: Offer command body is empty.\n"
+                    "Format: msp: offer: Pricing and bundle ideas for the product | Market"
                 )
 
             product, market = self._split_once(body, "|")
-            product = product or "Naməlum məhsul"
-            market = market or "Naməlum market"
+            product = product or "Unknown product"
+            market = market or "Unknown market"
 
             return (
                 "DS-04 Offer & Pricing Strategist (DEMO):\n"
-                f"Məhsul: {product}\n"
+                f"Product: {product}\n"
                 f"Market: {market}\n\n"
-                "Burada normalda ideal qiymət diapazonu, bundle təklifləri və upsell ideyaları generasiya "
-                "olunacaq. Hazırda struktur testi gedir. 💡"
+                "Here we will normally generate the ideal price range, bundle ideas and upsell offers. "
+                "Right now this is only a structure test. 💡"
             )
 
         # ==========================================================
         # 3) DS-02 DRIVE AGENT (real logical layer)
         # ==========================================================
         if lowered.startswith("drive"):
-            # Dəstəklənən formatlar:
+            # Supported formats:
             #   msp: drive: SamarkandSoulSystem / DS-01 - Market-Research-Master
             #   msp: drive SamarkandSoulSystem / DS-02 - Drive-Agent-Lab
             body = text
@@ -231,8 +240,8 @@ class MSP:
             path = (body or "").strip()
             if not path:
                 return (
-                    "MSP error: drive path boşdur.\n"
-                    "Nümunə:\n"
+                    "MSP error: drive path is empty.\n"
+                    "Examples:\n"
                     "  msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master\n"
                     "  msp: drive SamarkandSoulSystem / DS-02 - Drive-Agent-Lab"
                 )
@@ -240,12 +249,12 @@ class MSP:
             try:
                 return self.drive.create_folder_path(path)
             except Exception as e:  # pylint: disable=broad-except
-                return f"MSP error: DS-02 DriveAgent xətası: {e}"
+                return f"MSP error: DS-02 DriveAgent error: {e}"
 
         # ==========================================================
         # 3.5) SHOPIFY AGENT (DS03) — real API integration
         # ----------------------------------------------------------
-        # Nümunələr:
+        # Examples:
         #   msp: shopify: test
         #   msp: shopify: demo
         #   msp: shopify: comingsoon
@@ -282,7 +291,7 @@ class MSP:
                     """,
                     price="39.90",
                     tags=["samarkand soul", "demo", "tablecloth"],
-                    image_url=None,  # istəsən bura şəkil URL-i qoya bilərik
+                    image_url=None,  # we can put an image URL here later
                 )
                 return create_demo_product(spec)
 
@@ -292,7 +301,7 @@ class MSP:
 
             # --- add product via text prompt ---
             if lowered_body.startswith("add"):
-                # gözlənən format:
+                # expected format:
                 #   add | Title | Price | OptionalImageURL
                 after = raw_body[3:].strip()
                 if after.startswith("|"):
@@ -318,45 +327,45 @@ class MSP:
             )
 
         # ==========================================================
-        # 4) GENERIC DS / LIFE / SYS KOMANDALARI
+        # 4) GENERIC DS / LIFE / SYS COMMANDS
         # ==========================================================
         if ":" in text:
             prefix, _, body = text.partition(":")
             key = prefix.strip().lower()
-            query = body.strip() or "(boş sorğu)"
+            query = body.strip() or "(empty query)"
 
-            # ----- DS agentləri -----
+            # ----- DS agents -----
             if key in self.ds_labels:
                 label = self.ds_labels[key]
                 return (
                     f"{key.upper()} — {label} (DEMO):\n"
                     f"Input: {query}\n\n"
-                    "Bu agent hazırda struktur testi üçün stub cavab qaytarır. "
-                    "Gələcəkdə burada real LLM + inteqrasiyalar işləyəcək. 🧠"
+                    "This agent is currently in stub mode for structure testing. "
+                    "In the future it will run with real LLM + integrations. 🧠"
                 )
 
-            # ----- LIFE agentləri -----
+            # ----- LIFE agents -----
             if key in self.life_labels:
                 label = self.life_labels[key]
                 return (
                     f"{key.upper()} — {label} (DEMO):\n"
                     f"Input: {query}\n\n"
-                    "Bu LIFE agenti hazırda demo rejimindədir. Gələcəkdə şəxsi planlar və tövsiyələr "
-                    "buradan generasiya olunacaq."
+                    "This LIFE agent is in demo mode. In the future it will generate "
+                    "personal plans and recommendations."
                 )
 
-            # ----- SYS agentləri -----
+            # ----- SYS agents -----
             if key in self.sys_labels:
                 label = self.sys_labels[key]
                 return (
                     f"{key.upper()} — {label} (DEMO):\n"
                     f"Input: {query}\n\n"
-                    "Bu SYS agenti hazırda struktur testindədir. Sistem bilikləri və idarəetmə "
-                    "planları buradan idarə olunacaq."
+                    "This SYS agent is currently for structure testing. System knowledge and "
+                    "governance plans will be managed here later."
                 )
 
         # ==========================================================
-        # 4.5) TGA – TikTok Growth Agent tekst trigger-i
+        # 4.5) TGA – TikTok Growth Agent text trigger
         # ==========================================================
         if lowered.startswith("tga:") or lowered.startswith("tiktok:"):
             self.tga.run_daily_cycle()
@@ -364,18 +373,18 @@ class MSP:
             return summary
 
         # ==========================================================
-        # 5) TANINMAYAN KOMANDA
+        # 5) UNKNOWN COMMAND
         # ==========================================================
         return (
-            "MSP error: Bu MSP komandasını tanımadım.\n"
-            "Mümkün nümunələr:\n"
+            "MSP error: I did not recognize this MSP command.\n"
+            "Possible examples:\n"
             "  • msp: market: pet hair remover | US\n"
-            "  • msp: offer: pet hair remover üçün ideal qiymət və bundle ideyaları | US market\n"
+            "  • msp: offer: ideal pricing and bundle ideas for pet hair remover | US market\n"
             "  • msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master\n"
             "  • msp: drive SamarkandSoulSystem / DS-02 - Drive-Agent-Lab\n"
-            "  • msp: ds05: product page copy yaz pet hair remover üçün\n"
-            "  • msp: life01: sağlamlıq və vərdiş planı ver\n"
-            "  • msp: sys01: sistem bilik bazası haqqında izah et\n"
+            "  • msp: ds05: write product page copy for pet hair remover\n"
+            "  • msp: life01: give me a health & habit plan\n"
+            "  • msp: sys01: explain the system knowledge base\n"
             "  • msp: shopify: test / demo / comingsoon / add / collection\n"
-            "  • msp: tga: start  (TikTok Growth Agent günlük cycle)\n"
+            "  • msp: tga: start  (TikTok Growth Agent daily cycle)\n"
             )
