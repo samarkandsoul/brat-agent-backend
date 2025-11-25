@@ -1,3 +1,5 @@
+# app/main.py
+
 from fastapi import FastAPI
 from pydantic import BaseModel
 import os
@@ -5,7 +7,7 @@ import requests
 
 from app.agents.ds.ds01_market_research import analyze_market, MarketResearchRequest
 from app.agents.core.msp import MSP
-from app.llm.brat_gpt import brat_gpt_chat  # əgər artıq yuxarıda varsa, bu sətri təkrarlama
+from app.llm.brat_gpt import simple_chat  # brat_gpt_chat BURDAN İMPORT OLMUR
 
 app = FastAPI(title="BRAT Backend")
 
@@ -14,12 +16,39 @@ app = FastAPI(title="BRAT Backend")
 # =========================
 msp = MSP()
 
+
+# =========================
+#  BRAT GPT CHAT HELPER
+# =========================
+def brat_gpt_chat(user_text: str) -> str:
+    """
+    Generic Brat GPT dialog helper for Telegram.
+    simple_chat() üstündə nazik wrapper-dir.
+    """
+    system_prompt = (
+        "You are GPT Brat – strategic, honest and practical AI co-founder "
+        "for Zahid Brat and Samarkand Soul. "
+        "Speak clearly, be concrete, avoid fluff. "
+        "You may mix a tiny bit of playful tone, but focus on useful, "
+        "actionable advice."
+    )
+
+    reply = simple_chat(
+        system_prompt=system_prompt,
+        user_prompt=user_text,
+        model="gpt-4o-mini",
+        temperature=0.7,
+    )
+    return reply
+
+
 # =========================
 #  ROOT CHECK
 # =========================
 @app.get("/")
 def root():
     return {"status": "OK", "message": "BRAT backend running"}
+
 
 # =========================
 #  HEALTH CHECK (Monitor üçün)
@@ -32,8 +61,9 @@ def health():
     return {
         "status": "alive",
         "service": "agent-mesh",
-        "message": "Brat Agent Backend işləyir, agent şəbəkəsi aktivdir 🤖"
+        "message": "Brat Agent Backend işləyir, agent şəbəkəsi aktivdir 🤖",
     }
+
 
 # =========================
 #  DS-01 MARKET ANALYZE
@@ -45,6 +75,7 @@ def market_analyze(req: MarketResearchRequest):
     """
     result = analyze_market(req)
     return {"status": "success", "data": result}
+
 
 # =========================
 #  TELEGRAM MASTER AGENT
@@ -115,7 +146,8 @@ def handle_telegram_command(chat_id: int, text: str):
         if not msp_command:
             send_telegram_message(
                 chat_id,
-                "MSP komandası boşdur. Format nümunəsi:\n`msp: bugünkü tapşırıqlarım nədir?`",
+                "MSP komandası boşdur. Format nümunəsi:\n"
+                "`msp: bugünkü tapşırıqlarım nədir?`",
             )
             return
 
