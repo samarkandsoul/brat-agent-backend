@@ -47,12 +47,11 @@ def simple_chat(
     client = _get_client()
     if client is None:
         return (
-            "DS-01 info: OPENAI_API_KEY və ya OpenAI kitabxanası tapılmadı. "
-            "Hazırda DS-01 DEMO rejimindədir. 🔌"
+            "BratGPT info: OPENAI_API_KEY və ya OpenAI kitabxanası yoxdur. "
+            "Backend hazırda DEMO rejimdədir. 🔌"
         )
 
     try:
-        # Yeni OpenAI clientində klassik chat.completions interfeysi hələ də dəstəklənir.
         resp = client.chat.completions.create(
             model=model,
             messages=[
@@ -63,5 +62,29 @@ def simple_chat(
         )
         content = resp.choices[0].message.content or ""
         return content.strip()
-    except Exception as e:  # pylint: disable=broad-except
-        return f"DS-01 OpenAI xətası: {e}"
+    except Exception as e:
+        return f"BratGPT OpenAI xətası: {e}"
+
+
+# ======================================================
+#  BRAT GPT MAIN FUNCTION (Backend bunu çağırır)
+# ======================================================
+
+def brat_gpt_chat(text: str) -> str:
+    """
+    Telegram, Monitor, Agent Mesh üçün əsas GPT cavab funksiyası.
+    Əgər OpenAI aktiv deyilsə, fallback DEMO cavabı qaytarır.
+    """
+    system_prompt = (
+        "Sən BratGPT agentisən. Məqsədin qısa, aydın və səmimi cavab verməkdir. "
+        "Heç vaxt uzun esse yazma, sadə və lazımlı cavab ver."
+    )
+
+    result = simple_chat(
+        system_prompt=system_prompt,
+        user_prompt=text,
+        model="gpt-4o-mini",
+        temperature=0.7,
+    )
+
+    return result
