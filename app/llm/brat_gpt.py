@@ -6,16 +6,18 @@ from typing import Optional
 try:
     from openai import OpenAI
 except ImportError:
-    OpenAI = None  # library yoxdursa, error mesajı verəcəyik
+    OpenAI = None  # library not installed
 
+
+from app.mamos.mamos_loader import MAMOSLoader
 
 _client: Optional["OpenAI"] = None
 
 
 def _get_client() -> Optional["OpenAI"]:
     """
-    OpenAI client-i tək nüsxə kimi yaradır.
-    OPENAI_API_KEY yoxdursa, None qaytarır.
+    Create a single OpenAI client instance.
+    If OPENAI_API_KEY is missing or library is not installed, return None.
     """
     global _client
 
@@ -27,11 +29,33 @@ def _get_client() -> Optional["OpenAI"]:
         return None
 
     if OpenAI is None:
-        # Kitabxana quraşdırılmayıb
         return None
 
     _client = OpenAI(api_key=api_key)
     return _client
+
+
+def build_system_prompt(agent_role: str = "Samarkand Soul General Agent") -> str:
+    """
+    Build a unified system prompt for any agent using the MAMOS doctrine.
+    agent_role example: "DS-03 Shopify Agent" or "DS-06 Creative Scriptwriter".
+    """
+    mamos_doc = MAMOSLoader.load_mamos()
+
+    return f"""
+You are {agent_role} inside the Samarkand Soul ecosystem.
+
+You MUST strictly follow the brand doctrine (MAMOS) below.
+Never break its rules about premium quality, customer respect,
+platform compliance and long-term brand building.
+
+If the user asks for something that violates MAMOS, you MUST refuse
+or propose a safe, brand-aligned alternative.
+
+--- MAMOS START ---
+{mamos_doc}
+--- MAMOS END ---
+""".strip()
 
 
 def simple_chat(
@@ -41,14 +65,14 @@ def simple_chat(
     temperature: float = 0.7,
 ) -> str:
     """
-    Sadə chat helper.
-    OPENAI_API_KEY və ya openai kitabxanası yoxdursa, aydın error mətnı qaytarır.
+    Basic chat helper.
+    If OPENAI_API_KEY or OpenAI library is missing, return a clear info message.
     """
     client = _get_client()
     if client is None:
         return (
-            "BratGPT info: OPENAI_API_KEY və ya OpenAI kitabxanası yoxdur. "
-            "Backend hazırda DEMO rejimdədir. 🔌"
+            "LLM info: OPENAI_API_KEY or OpenAI library not found. "
+            "LLM is currently in DEMO mode. 🔌"
         )
 
     try:
@@ -62,29 +86,28 @@ def simple_chat(
         )
         content = resp.choices[0].message.content or ""
         return content.strip()
-    except Exception as e:
-        return f"BratGPT OpenAI xətası: {e}"
+    except Exception as e:  # pylint: disable=broad-except
+        return f"LLM error: {e}"
 
 
-# ======================================================
-#  BRAT GPT MAIN FUNCTION (Backend bunu çağırır)
-# ======================================================
-
-def brat_gpt_chat(text: str) -> str:
+def brat_gpt_chat(
+    user_prompt: str,
+    agent_role: str = "Samarkand Soul General Agent",
+    model: str = "gpt-4o-mini",
+    temperature: float = 0.6,
+) -> str:
     """
-    Telegram, Monitor, Agent Mesh üçün əsas GPT cavab funksiyası.
-    Əgər OpenAI aktiv deyilsə, fallback DEMO cavabı qaytarır.
-    """
-    system_prompt = (
-        "Sən BratGPT agentisən. Məqsədin qısa, aydın və səmimi cavab verməkdir. "
-        "Heç vaxt uzun esse yazma, sadə və lazımlı cavab ver."
-    )
+    Main entrypoint for Telegram 'Brat GPT' dialogue.
+    This function is used in the Agent Backend:
 
-    result = simple_chat(
+        from app.llm.brat_gpt import brat_gpt_chat
+
+    It automatically injects the MAMOS doctrine into the system prompt.
+    """
+    system_prompt = build_system_prompt(agent_role=agent_role)
+    return simple_chat(
         system_prompt=system_prompt,
-        user_prompt=text,
-        model="gpt-4o-mini",
-        temperature=0.7,
+        user_prompt=user_prompt,
+        model=model,
+        temperature=temperature,
     )
-
-    return result
