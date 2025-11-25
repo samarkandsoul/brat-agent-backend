@@ -5,6 +5,7 @@ import requests
 
 from app.agents.ds.ds01_market_research import analyze_market, MarketResearchRequest
 from app.agents.core.msp import MSP
+from app.llm.brat_gpt import brat_gpt_chat  # əgər artıq yuxarıda varsa, bu sətri təkrarlama
 
 app = FastAPI(title="BRAT Backend")
 
@@ -19,6 +20,20 @@ msp = MSP()
 @app.get("/")
 def root():
     return {"status": "OK", "message": "BRAT backend running"}
+
+# =========================
+#  HEALTH CHECK (Monitor üçün)
+# =========================
+@app.get("/health")
+def health():
+    """
+    Samarkand Monitor üçün sadə heartbeat endpoint.
+    """
+    return {
+        "status": "alive",
+        "service": "agent-mesh",
+        "message": "Brat Agent Backend işləyir, agent şəbəkəsi aktivdir 🤖"
+    }
 
 # =========================
 #  DS-01 MARKET ANALYZE
@@ -90,7 +105,7 @@ def handle_telegram_command(chat_id: int, text: str):
         send_telegram_message(chat_id, msg)
         return
 
-    # 2) MSP komandasI (msp: ... )
+    # 2) MSP komandası (msp: ... )
     if lower.startswith("msp:"):
         try:
             msp_command = text.split(":", 1)[1].strip()
@@ -112,7 +127,7 @@ def handle_telegram_command(chat_id: int, text: str):
         send_telegram_message(chat_id, f"*MSP cavabı:*\n{response}")
         return
 
-    # 3) DS-01 Market Research komandasI
+    # 3) DS-01 Market Research komandası
     if lower.startswith("market:"):
         try:
             after_keyword = text.split(":", 1)[1].strip()
