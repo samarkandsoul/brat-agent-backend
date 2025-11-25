@@ -4,6 +4,7 @@ from typing import Tuple, List, Dict, Any, Optional
 
 from app.agents.tiktok_growth.TGA_Main_Brain_manager import TikTokGrowthAgent
 from app.agents.ds.ds02_drive_agent import DriveAgent  # DS-02 Drive Agent
+from app.mamos.mamos_loader import MAMOSLoader  # 🔹 MAMOS Unified Brain Loader
 
 
 class MSP:
@@ -57,6 +58,17 @@ class MSP:
 
         # TikTok Growth Agent (TGA) – TikTok kontent fabriki
         self.tga = TikTokGrowthAgent()
+
+    # =========================
+    #  MAMOS – Unified Brain
+    # =========================
+    def load_mamos(self) -> str:
+        """
+        Load the global MAMOS doctrine.
+        Bütün agentlər Samarkand Soul missiyasını, qaydalarını
+        və nizam-intizamı bu sənəddən anlayırlar.
+        """
+        return MAMOSLoader.load_mamos()
 
     # =========================
     #  Helper-lər
