@@ -3,6 +3,7 @@
 from typing import Tuple, List, Dict, Any, Optional
 
 from app.agents.tiktok_growth.TGA_Main_Brain_manager import TikTokGrowthAgent
+from app.agents.ds.ds02_drive_agent import DriveAgent  # DS-02 Drive Agent
 
 
 class MSP:
@@ -50,6 +51,9 @@ class MSP:
             "sys04": "SYSTEM HEALTH & REFACTOR PLANNER",
             "sys05": "FUTURE-ROADMAP & INNOVATION-PLANNER",
         }
+
+        # DS-02 Drive Agent – qovluq blueprint-ləri üçün
+        self.drive = DriveAgent()
 
         # TikTok Growth Agent (TGA) – TikTok kontent fabriki
         self.tga = TikTokGrowthAgent()
@@ -200,22 +204,31 @@ class MSP:
             )
 
         # ==========================================================
-        # 3) DRIVE DEMO
+        # 3) DS-02 DRIVE AGENT (real logical layer)
         # ==========================================================
-        if lowered.startswith("drive:"):
-            path = text[len("drive:"):].strip()
+        if lowered.startswith("drive"):
+            # Dəstəklənən formatlar:
+            #   msp: drive: SamarkandSoulSystem / DS-01 - Market-Research-Master
+            #   msp: drive SamarkandSoulSystem / DS-02 - Drive-Agent-Lab
+            body = text
+            if lowered.startswith("drive:"):
+                body = text[len("drive:"):].strip()
+            elif lowered.startswith("drive"):
+                body = text[len("drive"):].strip()
+
+            path = (body or "").strip()
             if not path:
                 return (
                     "MSP error: drive path boşdur.\n"
-                    "Nümunə: msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master"
+                    "Nümunə:\n"
+                    "  msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master\n"
+                    "  msp: drive SamarkandSoulSystem / DS-02 - Drive-Agent-Lab"
                 )
 
-            return (
-                "Drive DEMO cavabı:\n"
-                "Bu path üçün qovluq strukturu yaradılmalı idi:\n"
-                f"{path}\n"
-                "Google Drive real inteqrasiyasını ayrıca test edib qoşacağıq. 🎛️"
-            )
+            try:
+                return self.drive.create_folder_path(path)
+            except Exception as e:  # pylint: disable=broad-except
+                return f"MSP error: DS-02 DriveAgent xətası: {e}"
 
         # ==========================================================
         # 3.5) SHOPIFY AGENT (DS03) — real API integration
@@ -347,6 +360,7 @@ class MSP:
             "  • msp: market: pet hair remover | US\n"
             "  • msp: offer: pet hair remover üçün ideal qiymət və bundle ideyaları | US market\n"
             "  • msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master\n"
+            "  • msp: drive SamarkandSoulSystem / DS-02 - Drive-Agent-Lab\n"
             "  • msp: ds05: product page copy yaz pet hair remover üçün\n"
             "  • msp: life01: sağlamlıq və vərdiş planı ver\n"
             "  • msp: sys01: sistem bilik bazası haqqında izah et\n"
