@@ -3,6 +3,7 @@
 class DriveAgent:
     """
     DEMO DriveAgent.
+
     Hələlik Google Drive API-dən istifadə etmir,
     sadəcə MSP-dən ona siqnal gəlib-gəlmədiyini yoxlayırıq.
     """
