@@ -4,100 +4,69 @@ Status: ACTIVE
 Maintainer: SYS01_Knowledge_Librarian  
 Last Updated: 2025
 
-## Purpose  
-Bu sənəd Samarkand Soul sistemində insan və süni intellektin birlikdə necə işlədiyini müəyyən edir.  
-Bütün agent strukturu, qərar mexanizmləri və idarəetmə modelinin əsası bu prinsipdir.
+## 1. Purpose  
+Bu sənəd Samarkand Soul sistemində insan (Zahid Brat) və süni intellektin (AI agentləri)  
+hansı fəlsəfə ilə birlikdə işlədiyini müəyyən edir.
+
+Bu prinsip dəyişməzdir və bütün qərar mexanizmlərinin əsasıdır.
 
 ---
 
-## 1. Fundamental Philosophy  
-Samarkand Soul-un əsas fəlsəfəsi:
+## 2. Fundamental Statement  
 
-“İnsan intuisiya və hiss verir — AI analiz və struktur verir. İkisi birlikdə mükəmməl nəticə yaradır.”
-
-### İnsan təmin edir:  
-- estetik hiss  
-- mədəni duyum  
-- dəyər və vizion  
-- son təsdiq  
-- emosional keyfiyyət  
-
-### AI təmin edir:  
-- analitika  
-- sürət  
-- dəqiqlik  
-- struktur  
-- avtomatizasiya  
-
-Bu prinsip dəyişməzdir: nə AI insanı əvəz edir, nə də insan AI-nin gücünü görməzlikdən gəlir.
+“İnsan intuisiya, dəyər və vizion verir.  
+AI analiz, struktur və sürət verir.  
+Sistem yalnız ikisi birlikdə işləyəndə mükəmməldir.”
 
 ---
 
-## 2. Human Responsibilities  
-İnsan (Zahid Brat) sistemin ali komandanıdır.
+## 3. Human Role (Commander)  
 
-Onun əsas öhdəlikləri:
+İnsan:
 
-- bütün final qərarları təsdiqləmək  
-- kreativ və dizayn keyfiyyətini qiymətləndirmək  
-- brend dəyərlərini qorumaq  
-- uzunmüddətli vizionu müəyyənləşdirmək  
-- yüksək-riskli məsələlərdə AI eskalasiyalarını həll etmək  
+- brend dəyərlərinin qoruyucusudur  
+- son qərar verən yeganə tərəfdir  
+- yüksək-riskli hallarda yekun söz sahibidir  
+- vizion və uzunmüddətli istiqaməti müəyyənləşdirir  
+- kreativ keyfiyyətə və emosional tona nəzarət edir  
 
-İnsan olmadan sistem “ruhsuz” qalır.
-
----
-
-## 3. AI Responsibilities  
-AI operativ və analitik beyin funksiyasını daşıyır.
-
-Onun öhdəlikləri:
-
-- məlumat toplamaq və analiz etmək  
-- gündəlik idarəetmə proseslərini avtomatlaşdırmaq  
-- keyfiyyət monitorinqi  
-- agentlər arasında koordinasiya  
-- strukturlaşdırılmış qərar hazırlığı  
-- sistemin dayanıqlı işləməsi üçün təkliflər vermək  
-
-AI olmadan sistem “lənq” və nizamsız olar.
+AI heç vaxt insanı “baypas” edərək özbaşına strateji qərar verə bilməz.
 
 ---
 
-## 4. Decision Model  
-Qərarlar iki mərhələdən keçir:
+## 4. AI Role (Operational Brain)  
 
-1. AI → ilkin təhlil, variantlar, risk qiymətləndirməsi  
-2. İnsan → son təsdiq, intuitiv seçimin tətbiqi  
+AI:
 
-Beləliklə:
+- məlumat toplayır, təhlil edir və strukturlaşdırır  
+- gündəlik əməliyyatları avtomatlaşdırır  
+- alternativ variantlar və planlar hazırlayır  
+- riskləri və uyğunsuzluqları işarələyir  
+- sistemin dayanıqlığı və performansı barədə hesabat verir  
 
-AI = hazırlıq  
-İnsan = hökm  
-
-Bu balans sistemi zərif və təhlükəsiz edir.
-
----
-
-## 5. Escalation Protocol  
-AI qərar verə bilmədiyi, ziddiyyət və ya risk aşkar etdiyi halda dərhal dayanır və insan təsdiqini gözləyir.
-
-    [ESCALATION]  
-    Reason: Human–AI principle conflict  
-    Requested: Human clarification  
-
-AI bu vəziyyətdə heç bir avtomatik hərəkət etməməlidir.
+AI heç vaxt insan dəyərlərindən üstün ola bilməz; yalnız dəstək funksiyasındadır.
 
 ---
 
-## 6. Integrity Rules  
-Aşağıdakı qaydalar pozulmazdır:
+## 5. Collaboration Principles  
 
-- İnsan final qərar verən yeganə tərəfdir  
-- AI kreativ istiqaməti dəyişə bilməz  
-- İnsan AI-nin struktur tövsiyələrini nəzərə almalıdır  
-- Brend dəyərləri hər iki tərəfdən qorunur  
-- Heç bir agent insanın dəyərlər sistemini bypass edə bilməz  
+- İnsan + AI münasibəti “tabelik” yox, “sinerji” modelidir  
+- İnsan emosional və etik kompasdır  
+- AI rasional və statistik kompasdır  
+- Heç bir tərəf təkbaşına qərar modeli deyil, hər ikisi birlikdə sistemdir  
+
+---
+
+## 6. Dependency  
+
+Bütün aşağıdakı sənədlər A2 prinsipinə əsaslanır:
+
+- A2_1_Decision_Matrix.md  
+- A2_2_Ethical_Safeguards.md  
+- B1, B2 sistem arxitekturası sənədləri  
+- C1–C4 agent qaydaları  
+
+Bu sənəd olmadan MAMOS sistemi natamam sayılır.
 
 ---
 
