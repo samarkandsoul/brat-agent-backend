@@ -54,6 +54,7 @@ class MSP:
             "ds18": "SUPPLIER & LOGISTICS-PLANNER",
             "ds19": "SCALE & EXIT-STRATEGIST",
             "ds20": "EXPERIMENTS & A/B TESTING LAB",
+            "ds21": "PRODUCT-AUTO-CREATOR",
         }
 
         # LIFE agents – protect the commander (health, time, clarity)
