@@ -23,11 +23,13 @@ class MSP:
     and dispatches them to the correct agent, integration or tool.
 
     Examples:
+      msp: mamos
       msp: market: pet hair remover | US
       msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master
       msp: shopify: test
+      msp: ds05: Samarkand Soul Ikat Tablecloth | premium home textile | ...
+      msp: product: Samarkand Soul Ikat Tablecloth | warm beige ikat | 39.90 | women 28–45 EU/US
       msp: gpt: Explain the Samarkand Soul brand in 3 sentences.
-      msp: mamos
     """
 
     def __init__(self) -> None:
@@ -348,6 +350,60 @@ class MSP:
             )
 
         # ==========================================================
+        # 3.8) DS-21 PRODUCT AUTO CREATOR
+        # ----------------------------------------------------------
+        # Examples:
+        #   msp: product: Samarkand Soul Ikat Tablecloth | warm beige ikat, minimalist | 39.90 | women 28–45 in EU & US
+        #   msp: ds21: Blue Ikat Tablecloth | deep blue pattern | 44.90 | gift-ready premium packaging
+        # ==========================================================
+        if lowered.startswith("product:") or lowered.startswith("ds21:"):
+            if lowered.startswith("product:"):
+                body = text[len("product:"):].strip()
+            else:
+                body = text[len("ds21:"):].strip()
+
+            if not body:
+                return (
+                    "MSP error: Product command body is empty.\n"
+                    "Example:\n"
+                    "  msp: product: Samarkand Soul Ikat Tablecloth | warm beige ikat, minimalist | 39.90 | women 28–45 in EU & US"
+                )
+
+            parts = [p.strip() for p in body.split("|")]
+            title_seed = parts[0] if len(parts) > 0 else ""
+            style_brief = parts[1] if len(parts) > 1 else ""
+            price_hint = parts[2] if len(parts) > 2 else ""
+            extra_info = " | ".join(parts[3:]) if len(parts) > 3 else ""
+
+            if not title_seed:
+                return (
+                    "MSP error: Product title seed cannot be empty.\n"
+                    "Example:\n"
+                    "  msp: product: Samarkand Soul Ikat Tablecloth | warm beige ikat, minimalist | 39.90 | women 28–45 in EU & US"
+                )
+
+            try:
+                from app.agents.ds.ds21_product_auto_creator import (
+                    ProductAutoCreator,
+                    ProductIdea,
+                )
+            except Exception as e:  # pylint: disable=broad-except
+                return f"MSP error: DS-21 module import failed: {e}"
+
+            creator = ProductAutoCreator()
+            idea = ProductIdea(
+                title_seed=title_seed,
+                style_brief=style_brief,
+                price_hint=price_hint,
+                extra_info=extra_info,
+            )
+
+            try:
+                return creator.create_full_product(idea)
+            except Exception as e:  # pylint: disable=broad-except
+                return f"MSP error: DS-21 processing error: {e}"
+
+        # ==========================================================
         # 3.6) DS-05 PRODUCT PAGE COPYWRITER (real LLM via AgentBrain)
         # ----------------------------------------------------------
         # Example:
@@ -465,6 +521,7 @@ class MSP:
             "  • msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master\n"
             "  • msp: drive SamarkandSoulSystem / DS-02 - Drive-Agent-Lab\n"
             "  • msp: ds05: Samarkand Soul Ikat Tablecloth | premium home textile | target customer ...\n"
+            "  • msp: product: Samarkand Soul Ikat Tablecloth | warm beige ikat | 39.90 | women 28–45 EU/US\n"
             "  • msp: life01: give me a health & habit plan\n"
             "  • msp: sys01: explain the system knowledge base\n"
             "  • msp: shopify: test / demo / comingsoon / add / collection\n"
