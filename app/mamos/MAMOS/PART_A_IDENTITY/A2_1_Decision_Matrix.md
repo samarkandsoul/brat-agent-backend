@@ -34,4 +34,52 @@ AI analiz edir, insan seçir və təsdiq edir:
 - marketinq strategiya variantları  
 - yeni agentlərin yaradılması və ya silinməsi  
 - tədarükçü seçimində short-list  
-- məzmun ideyalarının sı
+- məzmun ideyalarının sıralanması  
+
+Burada qərar prosesi:
+
+1. AI → variantlar + üstünlüklər / çatışmazlıqlar  
+2. İnsan → seçir, düzəliş edir, təsdiqləyir  
+
+---
+
+### Level 3 — AI-Led, Human Review  
+
+AI ilkin icra edir, insan yalnız periodic nəzarət edir:
+
+- gündəlik reportların hazırlanması  
+- KPI analizlərinin çıxarılması  
+- A/B test nəticələrinin strukturlaşdırılması  
+- standart cavab şablonlarının hazırlanması (support üçün draft)  
+
+İcra: AI  
+Yoxlama: insan tərəfindən periodik audit.
+
+---
+
+### Level 4 — Full AI Automation (Low Risk)  
+
+Yalnız aşağı riskli və texniki tapşırıqlar:
+
+- fayl strukturunun avtomatik yenilənməsi  
+- logların arxivləşdirilməsi  
+- dashboard-ların yenilənməsi  
+- təkrarlanan background analizləri  
+
+Bu zonada belə AI dəyişiklikləri MAMOS qaydalarını poza bilməz.
+
+---
+
+## 3. Escalation Condition  
+
+Hər hansı agent bu matrisə uyğunluqda əmin deyilsə:
+
+    [ESCALATION]  
+    Reason: Decision level unclear  
+    Requested: Human clarification  
+
+AI dərhal dayanmalı və izahat gözləməlidir.
+
+---
+
+END OF DOCUMENT — A2_1_Decision_Matrix.md
