@@ -1,5 +1,3 @@
-# app/agents/core/msp.py
-
 from typing import Tuple, List, Dict, Any, Optional
 
 # TikTok Growth brain
@@ -31,6 +29,7 @@ class MSP:
       msp: product: Samarkand Soul Ikat Tablecloth | warm beige ikat | 39.90 | women 28–45 EU/US
       msp: image: Samarkand Soul Ikat Tablecloth | hero image for product page | warm beige, minimalist, family dinner
       msp: gpt: Explain the Samarkand Soul brand in 3 sentences.
+      msp: tga: start
     """
 
     def __init__(self) -> None:
@@ -317,7 +316,7 @@ class MSP:
                     """,
                     price="39.90",
                     tags=["samarkand soul", "demo", "tablecloth"],
-                    image_url=None,  # optional demo image URL
+                    image_url=None,
                 )
                 return create_demo_product(spec)
 
