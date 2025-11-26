@@ -2,19 +2,35 @@
 
 from typing import Tuple, List, Dict, Any, Optional
 
+# TikTok Growth brain
 from app.agents.tiktok_growth.TGA_Main_Brain_manager import TikTokGrowthAgent
-from app.agents.ds.ds02_drive_agent import DriveAgent  # DS-02 Drive Agent
-from app.mamos.mamos_loader import MAMOSLoader  # MAMOS Unified Brain Loader
+
+# DS-02 Drive Agent
+from app.agents.ds.ds02_drive_agent import DriveAgent
+
+# MAMOS – unified doctrine loader
+from app.mamos.mamos_loader import MAMOSLoader
+
+# Brat GPT – unified LLM interface (MAMOS-aware)
+from app.llm.brat_gpt import brat_gpt_chat
 
 
 class MSP:
     """
-    MSP (Main Service Processor) - main router of the Samarkand Soul bot.
-    It reads commands starting with 'msp:' and routes them to the correct agent.
+    MSP (Main Service Processor) – central router for the Samarkand Soul bot.
+
+    It receives all `msp: ...` style commands from Telegram
+    and dispatches them to the correct agent, integration or tool.
+
+    Examples:
+      msp: market: pet hair remover | US
+      msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master
+      msp: shopify: test
+      msp: gpt: Explain the Samarkand Soul brand in 3 sentences.
     """
 
     def __init__(self) -> None:
-        # DS, LIFE and SYS agent label maps (for DEMO responses)
+        # DS (Dropshipping System) agent labels (for generic demo handlers)
         self.ds_labels = {
             "ds02": "DRIVE-AGENT",
             "ds03": "SHOPIFY-AGENT",
@@ -37,6 +53,7 @@ class MSP:
             "ds20": "EXPERIMENTS & A/B TESTING LAB",
         }
 
+        # LIFE agents – protect the commander (health, time, clarity)
         self.life_labels = {
             "life01": "HEALTH & HABIT-COACH",
             "life02": "NUTRITION & MEAL PLANNER",
@@ -45,6 +62,7 @@ class MSP:
             "life05": "INFO & NEWS CURATOR",
         }
 
+        # SYS agents – keep the ecosystem clean and evolving
         self.sys_labels = {
             "sys01": "KNOWLEDGE-LIBRARIAN",
             "sys02": "SECURITY & PRIVACY-GUARDIAN",
@@ -53,10 +71,10 @@ class MSP:
             "sys05": "FUTURE-ROADMAP & INNOVATION-PLANNER",
         }
 
-        # DS-02 Drive Agent – for Google Drive / folder blueprints
+        # DS-02 Drive Agent – folder blueprints
         self.drive = DriveAgent()
 
-        # TikTok Growth Agent (TGA) – TikTok content factory
+        # TikTok Growth Agent (TGA) – content factory
         self.tga = TikTokGrowthAgent()
 
     # =========================
@@ -65,18 +83,19 @@ class MSP:
     def load_mamos(self) -> str:
         """
         Load the global MAMOS doctrine.
-        All agents use this to understand the Samarkand Soul mission,
-        rules and discipline.
+
+        All agents should conceptually use this to understand
+        the Samarkand Soul mission, rules and discipline.
         """
         return MAMOSLoader.load_mamos()
 
     # =========================
-    #  Helpers
+    #  Helper functions
     # =========================
     @staticmethod
     def _strip_msp_prefix(raw_text: str) -> str:
         """
-        Removes the 'msp:' prefix and trims leading / trailing spaces.
+        Remove the 'msp:' prefix and trim whitespace.
         """
         text = (raw_text or "").strip()
         if text.lower().startswith("msp:"):
@@ -86,7 +105,7 @@ class MSP:
     @staticmethod
     def _split_once(body: str, sep: str = "|") -> Tuple[str, str]:
         """
-        Splits 'a | b' into two parts with a single separator.
+        Split "a | b" format into two parts.
         """
         parts = [p.strip() for p in body.split(sep, 1)]
         if len(parts) == 1:
@@ -98,9 +117,10 @@ class MSP:
     # =========================
     def build_tga_preview_payloads(self) -> List[Dict[str, Any]]:
         """
-        Returns Telegram-ready preview payloads for the TikTok Growth Agent.
+        Build Telegram-ready preview payloads for the TikTok Growth Agent.
 
-        Example usage from the outer bot layer:
+        The external bot layer can use it like:
+
             payloads = msp.build_tga_preview_payloads()
             for p in payloads:
                 bot.send_message(chat_id, **p)
@@ -111,7 +131,7 @@ class MSP:
         """
         Router for Telegram callback_data.
 
-        Currently only supports TGA callbacks:
+        Currently supports only TGA callbacks:
           - tga_approve:<draft_id>
           - tga_reject:<draft_id>
         """
@@ -121,12 +141,12 @@ class MSP:
         if callback_data.startswith("tga_approve:"):
             draft_id = callback_data.split(":", 1)[1]
             self.tga.handle_telegram_approval(draft_id, approved=True)
-            return "✅ Video approved. Added to the posting queue."
+            return "✅ Video approved. Added to posting queue."
 
         if callback_data.startswith("tga_reject:"):
             draft_id = callback_data.split(":", 1)[1]
             self.tga.handle_telegram_approval(draft_id, approved=False)
-            return "❌ Video rejected. A new version will be generated."
+            return "❌ Video rejected. A new variant will be generated."
 
         return None  # other callback types
 
@@ -135,7 +155,7 @@ class MSP:
     # =========================
     def process(self, raw_text: str) -> str:
         """
-        Main entrypoint for all MSP *text* commands coming from Telegram.
+        Main entrypoint for ALL MSP *text* commands coming from Telegram.
         """
         if not raw_text:
             return "MSP error: empty message."
@@ -145,15 +165,6 @@ class MSP:
             return "MSP error: empty MSP command."
 
         lowered = text.lower()
-
-        # ==========================================
-        # 0) MAMOS – show global doctrine
-        # ==========================================
-        if lowered.startswith("mamos"):
-            doc = self.load_mamos()
-            # Telegram has limits – send only a preview
-            preview = doc[:3500]
-            return "📜 MAMOS — Samarkand Soul Doctrine (preview):\n\n" + preview
 
         # ==========================================================
         # 1) DS-01 MARKET RESEARCH (real module)
@@ -209,7 +220,7 @@ class MSP:
             if not body:
                 return (
                     "MSP error: Offer command body is empty.\n"
-                    "Format: msp: offer: Pricing and bundle ideas for the product | Market"
+                    "Format: msp: offer: Product description | Market"
                 )
 
             product, market = self._split_once(body, "|")
@@ -220,8 +231,8 @@ class MSP:
                 "DS-04 Offer & Pricing Strategist (DEMO):\n"
                 f"Product: {product}\n"
                 f"Market: {market}\n\n"
-                "Here we will normally generate the ideal price range, bundle ideas and upsell offers. "
-                "Right now this is only a structure test. 💡"
+                "Here, in the full version, the agent would generate ideal price ranges, "
+                "bundle ideas and upsell concepts. Currently this is a structure test. 💡"
             )
 
         # ==========================================================
@@ -249,7 +260,7 @@ class MSP:
             try:
                 return self.drive.create_folder_path(path)
             except Exception as e:  # pylint: disable=broad-except
-                return f"MSP error: DS-02 DriveAgent error: {e}"
+                return f"MSP error: DS-02 DriveAgent failure: {e}"
 
         # ==========================================================
         # 3.5) SHOPIFY AGENT (DS03) — real API integration
@@ -277,7 +288,7 @@ class MSP:
             except Exception as e:  # pylint: disable=broad-except
                 return f"MSP error: DS03 Shopify agent import failed: {e}"
 
-            # --- test ---
+            # --- test connection ---
             if lowered_body.startswith("test"):
                 return test_shopify_connection()
 
@@ -291,7 +302,7 @@ class MSP:
                     """,
                     price="39.90",
                     tags=["samarkand soul", "demo", "tablecloth"],
-                    image_url=None,  # we can put an image URL here later
+                    image_url=None,  # optional demo image URL
                 )
                 return create_demo_product(spec)
 
@@ -301,7 +312,7 @@ class MSP:
 
             # --- add product via text prompt ---
             if lowered_body.startswith("add"):
-                # expected format:
+                # Expected format:
                 #   add | Title | Price | OptionalImageURL
                 after = raw_body[3:].strip()
                 if after.startswith("|"):
@@ -310,7 +321,7 @@ class MSP:
 
             # --- create collection ---
             if lowered_body.startswith("collection"):
-                # format:
+                # Format:
                 #   collection | Premium Tablecloths
                 after = raw_body[len("collection"):].strip()
                 if after.startswith("|"):
@@ -327,7 +338,35 @@ class MSP:
             )
 
         # ==========================================================
-        # 4) GENERIC DS / LIFE / SYS COMMANDS
+        # 3.7) GPT / MAMOS-aware General Chat
+        # ----------------------------------------------------------
+        # Examples:
+        #   msp: gpt: What is the Samarkand Soul brand?
+        #   msp: chat: Explain our mission in 3 sentences.
+        # ==========================================================
+        if lowered.startswith("gpt:") or lowered.startswith("chat:"):
+            if lowered.startswith("gpt:"):
+                body = text[len("gpt:"):].strip()
+            else:
+                body = text[len("chat:"):].strip()
+
+            if not body:
+                return (
+                    "MSP error: GPT command body is empty.\n"
+                    "Example: msp: gpt: Explain the Samarkand Soul brand in 3 sentences."
+                )
+
+            try:
+                reply = brat_gpt_chat(
+                    user_prompt=body,
+                    agent_role="Samarkand Soul General Agent",
+                )
+                return f"MSP / GPT reply:\n{reply}"
+            except Exception as e:  # pylint: disable=broad-except
+                return f"MSP error: GPT bridge failed: {e}"
+
+        # ==========================================================
+        # 4) GENERIC DS / LIFE / SYS COMMANDS (demo stubs)
         # ==========================================================
         if ":" in text:
             prefix, _, body = text.partition(":")
@@ -340,8 +379,8 @@ class MSP:
                 return (
                     f"{key.upper()} — {label} (DEMO):\n"
                     f"Input: {query}\n\n"
-                    "This agent is currently in stub mode for structure testing. "
-                    "In the future it will run with real LLM + integrations. 🧠"
+                    "This agent is currently running in structure-test mode. "
+                    "Later it will use real LLM + integrations. 🧠"
                 )
 
             # ----- LIFE agents -----
@@ -360,8 +399,8 @@ class MSP:
                 return (
                     f"{key.upper()} — {label} (DEMO):\n"
                     f"Input: {query}\n\n"
-                    "This SYS agent is currently for structure testing. System knowledge and "
-                    "governance plans will be managed here later."
+                    "This SYS agent is in structure-test mode. System knowledge and "
+                    "governance plans will live here."
                 )
 
         # ==========================================================
@@ -386,5 +425,6 @@ class MSP:
             "  • msp: life01: give me a health & habit plan\n"
             "  • msp: sys01: explain the system knowledge base\n"
             "  • msp: shopify: test / demo / comingsoon / add / collection\n"
+            "  • msp: gpt: Explain the Samarkand Soul brand in 3 sentences\n"
             "  • msp: tga: start  (TikTok Growth Agent daily cycle)\n"
             )
