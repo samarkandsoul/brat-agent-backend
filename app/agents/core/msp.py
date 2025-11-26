@@ -29,6 +29,7 @@ class MSP:
       msp: shopify: test
       msp: ds05: Samarkand Soul Ikat Tablecloth | premium home textile | ...
       msp: product: Samarkand Soul Ikat Tablecloth | warm beige ikat | 39.90 | women 28–45 EU/US
+      msp: image: Samarkand Soul Ikat Tablecloth | hero image for product page | warm beige, minimalist, family dinner
       msp: gpt: Explain the Samarkand Soul brand in 3 sentences.
     """
 
@@ -55,6 +56,7 @@ class MSP:
             "ds19": "SCALE & EXIT-STRATEGIST",
             "ds20": "EXPERIMENTS & A/B TESTING LAB",
             "ds21": "PRODUCT-AUTO-CREATOR",
+            "ds22": "IMAGE-AUTO-AGENT",
         }
 
         # LIFE agents – protect the commander (health, time, clarity)
@@ -405,6 +407,61 @@ class MSP:
                 return f"MSP error: DS-21 processing error: {e}"
 
         # ==========================================================
+        # 3.9) DS-22 IMAGE AUTO AGENT
+        # ----------------------------------------------------------
+        # Generates AI image prompts, shot list, filenames, alt-text
+        # Examples:
+        #   msp: image: Samarkand Soul Ikat Tablecloth | hero image for product page | warm beige, minimalist, family dinner
+        #   msp: ds22: Blue Ikat Tablecloth | lifestyle shots for TikTok | cozy evening, candles, premium home textile
+        # ==========================================================
+        if lowered.startswith("image:") or lowered.startswith("ds22:"):
+            if lowered.startswith("image:"):
+                body = text[len("image:"):].strip()
+            else:
+                body = text[len("ds22:"):].strip()
+
+            if not body:
+                return (
+                    "MSP error: Image command body is empty.\n"
+                    "Example:\n"
+                    "  msp: image: Samarkand Soul Ikat Tablecloth | hero image for product page | warm beige, minimalist, family dinner"
+                )
+
+            parts = [p.strip() for p in body.split("|")]
+            product_name = parts[0] if len(parts) > 0 else ""
+            use_case = parts[1] if len(parts) > 1 else ""
+            style_notes = parts[2] if len(parts) > 2 else ""
+            extra_info = " | ".join(parts[3:]) if len(parts) > 3 else ""
+
+            if not product_name:
+                return (
+                    "MSP error: Product name for image agent cannot be empty.\n"
+                    "Example:\n"
+                    "  msp: image: Samarkand Soul Ikat Tablecloth | hero image for product page | warm beige, minimalist, family dinner"
+                )
+
+            try:
+                from app.agents.ds.ds22_image_auto_agent import (
+                    ImageAutoAgent,
+                    ImageIdea,
+                )
+            except Exception as e:  # pylint: disable=broad-except
+                return f"MSP error: DS-22 module import failed: {e}"
+
+            agent = ImageAutoAgent()
+            idea = ImageIdea(
+                product_name=product_name,
+                use_case=use_case,
+                style_notes=style_notes,
+                extra_info=extra_info,
+            )
+
+            try:
+                return agent.generate_image_plan(idea)
+            except Exception as e:  # pylint: disable=broad-except
+                return f"MSP error: DS-22 processing error: {e}"
+
+        # ==========================================================
         # 3.6) DS-05 PRODUCT PAGE COPYWRITER (real LLM via AgentBrain)
         # ----------------------------------------------------------
         # Example:
@@ -523,6 +580,7 @@ class MSP:
             "  • msp: drive SamarkandSoulSystem / DS-02 - Drive-Agent-Lab\n"
             "  • msp: ds05: Samarkand Soul Ikat Tablecloth | premium home textile | target customer ...\n"
             "  • msp: product: Samarkand Soul Ikat Tablecloth | warm beige ikat | 39.90 | women 28–45 EU/US\n"
+            "  • msp: image: Samarkand Soul Ikat Tablecloth | hero image for product page | warm beige, minimalist, family dinner\n"
             "  • msp: life01: give me a health & habit plan\n"
             "  • msp: sys01: explain the system knowledge base\n"
             "  • msp: shopify: test / demo / comingsoon / add / collection\n"
