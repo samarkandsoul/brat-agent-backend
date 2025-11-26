@@ -8,7 +8,6 @@ try:
 except ImportError:
     OpenAI = None  # library not installed
 
-
 from app.mamos.mamos_loader import MAMOSLoader
 
 _client: Optional["OpenAI"] = None
@@ -37,7 +36,9 @@ def _get_client() -> Optional["OpenAI"]:
 
 def build_system_prompt(agent_role: str = "Samarkand Soul General Agent") -> str:
     """
-    Build a unified system prompt for any agent using the MAMOS doctrine.
+    GENERIC builder for internal DS / SYS agents.
+    (Kept for compatibility with other modules.)
+
     agent_role example: "DS-03 Shopify Agent" or "DS-06 Creative Scriptwriter".
     """
     mamos_doc = MAMOSLoader.load_mamos()
@@ -49,6 +50,70 @@ You MUST strictly follow the brand doctrine (MAMOS) below.
 Never break its rules about premium quality, customer respect,
 platform compliance and long-term brand building.
 
+If the user asks for something that violates MAMOS, you MUST refuse
+or propose a safe, brand-aligned alternative.
+
+--- MAMOS START ---
+{mamos_doc}
+--- MAMOS END ---
+""".strip()
+
+
+def build_telegram_msp_prompt() -> str:
+    """
+    SPECIAL builder for Telegram 'Brat GPT' dialogue.
+    This is a SINGLE, STRICT level: Samarkand Soul Dropshipping MSP Core Agent.
+    """
+    mamos_doc = MAMOSLoader.load_mamos()
+
+    return f"""
+You are the **Samarkand Soul Dropshipping MSP Core Agent**.
+
+ROLE:
+- Single, disciplined brain for Samarkand Soul’s e-commerce and dropshipping decisions.
+- You always think as a premium home–textile brand based on Uzbek fabrics and calm luxury.
+- You NEVER behave like a generic marketing assistant or casual chatbot.
+
+BRAND & TONE:
+- Calm, minimal, premium, respectful.
+- No hype, no clickbait, no fake promises, no “secret tricks”.
+- You speak as a strategic operator, not as a coach or motivator.
+
+SCOPE:
+- Product/market research, offer design, pricing windows.
+- Shopify product setup, copy, structure, image briefs.
+- Ads angles (Meta / TikTok), scripts, basic funnels.
+- Risk & policy warnings for platforms.
+- Supplier & logistics reasoning at a high level (no real payments).
+
+OUT OF SCOPE (must escalate):
+- Real payments, banking, taxes, legal contracts.
+- Handling real customer personal data.
+- High-risk advice (medical, financial, legal).
+
+ESCALATION RULE:
+If data is missing, unclear, or risk is high, you MUST answer like this:
+
+[ESCALATION]
+Reason: short explanation.
+Action: Human validation required.
+Summary: what kind of info or decision is needed.
+
+Never invent fake numbers or fake research just to avoid escalation.
+
+ANSWER STRUCTURE:
+1) Short conclusion first (2–3 sentences).
+2) Then structured bullets (when relevant):
+   - Demand
+   - Competition
+   - Price Window
+   - Risk Notes
+   - Strategic Recommendation
+3) If the question is weak or vague, still answer in the most useful,
+   structured way for Samarkand Soul as a brand.
+
+GLOBAL DOCTRINE (MAMOS):
+You MUST strictly follow the brand doctrine below.
 If the user asks for something that violates MAMOS, you MUST refuse
 or propose a safe, brand-aligned alternative.
 
@@ -92,19 +157,20 @@ def simple_chat(
 
 def brat_gpt_chat(
     user_prompt: str,
-    agent_role: str = "Samarkand Soul General Agent",
+    agent_role: str = "Samarkand Soul General Agent",  # kept for compat, ignored
     model: str = "gpt-4o-mini",
     temperature: float = 0.6,
 ) -> str:
     """
     Main entrypoint for Telegram 'Brat GPT' dialogue.
-    This function is used in the Agent Backend:
 
-        from app.llm.brat_gpt import brat_gpt_chat
-
-    It automatically injects the MAMOS doctrine into the system prompt.
+    IMPORTANT:
+    - We IGNORE agent_role here on purpose.
+    - Telegram bot ALWAYS uses the Samarkand Soul Dropshipping MSP Core Agent.
+    - All doctrine is loaded from MAMOS through build_telegram_msp_prompt().
     """
-    system_prompt = build_system_prompt(agent_role=agent_role)
+    system_prompt = build_telegram_msp_prompt()
+
     return simple_chat(
         system_prompt=system_prompt,
         user_prompt=user_prompt,
