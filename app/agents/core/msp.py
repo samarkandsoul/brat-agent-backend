@@ -27,6 +27,7 @@ class MSP:
       msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master
       msp: shopify: test
       msp: gpt: Explain the Samarkand Soul brand in 3 sentences.
+      msp: mamos
     """
 
     def __init__(self) -> None:
@@ -167,6 +168,15 @@ class MSP:
         lowered = text.lower()
 
         # ==========================================================
+        # 0) MAMOS – show global doctrine
+        # ==========================================================
+        if lowered.startswith("mamos"):
+            doc = self.load_mamos()
+            # Telegram has limits – show only a preview; full text lives in repo
+            preview = doc[:3500]
+            return "📜 MAMOS — Samarkand Soul Doctrine (preview):\n\n" + preview
+
+        # ==========================================================
         # 1) DS-01 MARKET RESEARCH (real module)
         # ==========================================================
         if lowered.startswith("market:") or lowered.startswith("ds01:"):
@@ -240,7 +250,7 @@ class MSP:
         # ==========================================================
         if lowered.startswith("drive"):
             # Supported formats:
-            #   msp: drive: SamarkandSoulSystem / DS-01 - Market-Research-Master
+            #   msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master
             #   msp: drive SamarkandSoulSystem / DS-02 - Drive-Agent-Lab
             body = text
             if lowered.startswith("drive:"):
@@ -338,6 +348,38 @@ class MSP:
             )
 
         # ==========================================================
+        # 3.6) DS-05 PRODUCT PAGE COPYWRITER (real LLM via AgentBrain)
+        # ----------------------------------------------------------
+        # Example:
+        #   msp: ds05: Samarkand Soul Ikat Tablecloth | premium home textile | \
+        #         modern minimalist women in Europe | gift-ready, table as ritual | \
+        #         mention Samarkand spirit and premium packaging
+        # ==========================================================
+        if lowered.startswith("ds05:"):
+            body = text[len("ds05:"):].strip()
+            if not body:
+                return (
+                    "MSP error: ds05 body is empty.\n"
+                    "Format:\n"
+                    "  msp: ds05: Product name | Niche | Target customer | Main benefit | Extra notes\n"
+                    "Example:\n"
+                    "  msp: ds05: Samarkand Soul Ikat Tablecloth | premium home textile | "
+                    "modern minimalist women in Europe | gift-ready, table as a ritual"
+                )
+
+            try:
+                from app.agents.ds.ds05_product_page_copywriter import (
+                    generate_product_page_copy_from_text,
+                )
+            except Exception as e:  # pylint: disable=broad-except
+                return f"MSP error: could not import DS-05 module: {e}"
+
+            try:
+                return generate_product_page_copy_from_text(body)
+            except Exception as e:  # pylint: disable=broad-except
+                return f"MSP error: DS-05 processing error: {e}"
+
+        # ==========================================================
         # 3.7) GPT / MAMOS-aware General Chat
         # ----------------------------------------------------------
         # Examples:
@@ -417,11 +459,12 @@ class MSP:
         return (
             "MSP error: I did not recognize this MSP command.\n"
             "Possible examples:\n"
+            "  • msp: mamos\n"
             "  • msp: market: pet hair remover | US\n"
             "  • msp: offer: ideal pricing and bundle ideas for pet hair remover | US market\n"
             "  • msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master\n"
             "  • msp: drive SamarkandSoulSystem / DS-02 - Drive-Agent-Lab\n"
-            "  • msp: ds05: write product page copy for pet hair remover\n"
+            "  • msp: ds05: Samarkand Soul Ikat Tablecloth | premium home textile | target customer ...\n"
             "  • msp: life01: give me a health & habit plan\n"
             "  • msp: sys01: explain the system knowledge base\n"
             "  • msp: shopify: test / demo / comingsoon / add / collection\n"
