@@ -171,7 +171,10 @@ Natamam input olarsa → ESCALATE.
     ]
   }
 }
+```
+
 ---
+
 ### 5.2 Human-Friendly Summary
 
 Product Name: Uzbek Cotton Tablecloth — Samarkand Blue  
@@ -188,17 +191,18 @@ Images: validated (2+)
 
 ### 5.3 HTML Preview
 
-<pre><code>&lt;div class="product-description"&gt;
-  &lt;h2&gt;THE SOUL OF SAMARKAND&lt;/h2&gt;
-  &lt;p&gt;Premium handwoven cotton tablecloth bringing timeless elegance to your daily rituals.&lt;/p&gt;
-  &lt;hr class="gold-line" /&gt;
-  &lt;ul&gt;
-    &lt;li&gt;Material: 100% Uzbek Cotton&lt;/li&gt;
-    &lt;li&gt;Size: 150x250 cm&lt;/li&gt;
-    &lt;li&gt;Color: Samarkand Blue&lt;/li&gt;
-  &lt;/ul&gt;
-&lt;/div&gt;
-</code></pre>
+```html
+<div class="product-description">
+  <h2>THE SOUL OF SAMARKAND</h2>
+  <p>Premium handwoven cotton tablecloth bringing timeless elegance to your daily rituals.</p>
+  <hr class="gold-line" />
+  <ul>
+    <li>Material: 100% Uzbek Cotton</li>
+    <li>Size: 150x250 cm</li>
+    <li>Color: Samarkand Blue</li>
+  </ul>
+</div>
+```
 
 ---
 
@@ -224,7 +228,7 @@ Images: validated (2+)
 
 **Typography:**  
 - Serif (titles)  
-- Sans-serif (body)  
+- Sans-serif (body)
 
 **Visual Aesthetic:**  
 - minimal, premium, calm luxury  
@@ -250,32 +254,33 @@ DS03 aşağıdakı hallarda ESCALATE etməlidir:
 - material info yanlış və ya natamamdır  
 - şəkillər keyfiyyətsizdir  
 - HTML strukturu zədələnə bilər  
-- pricing məntiqsiz və ya bazardan çox uzaqdır  
+- pricing məntiqsizdir  
 - input formatı səhvdir  
 - Shopify API error verir  
-- məhsul Samarkand Soul brend estetikasına uyğun deyil  
+- məhsul brend estetikasına uyğun deyil  
 
-<pre><code>[ESCALATION]  
+```text
+[ESCALATION]  
 Reason: Invalid or incomplete product data  
 Action: Human validation required  
 Summary: Shopify product creation halted  
-</code></pre>
+```
 
 ---
 
 ## 8. Document Integrity
 
-- Bu sənəd SYS01_Knowledge_Librarian tərəfindən qorunur  
+- SYS01_Knowledge_Librarian tərəfindən qorunur  
 - Dəyişiklik yalnız Komander təsdiqi ilə mümkündür  
-- Sənəd MAMOS → PART_C_AGENTS_BIBLE altında saxlanılır  
+- Sənəd PART_C_AGENTS_BIBLE altında saxlanılır  
 - Versiya nəzarəti GitHub üzərindən aparılmalıdır  
 
 ---
 
 ## 9. Final Statement
 
-DS03 Shopify Agent Samarkand Soul ekosistemində satışın ana sütunudur.  
-Onun işi yalnız məhsul əlavə etmək deyil — **premium online vitrin** yaratmaqdır.
+DS03 Shopify Agent Samarkand Soul-un premium satış mühərrikidir.  
+Onun işi təkcə məhsul yükləmək deyil — **premium digital vitrin yaratmaqdır.**
 
 Bu sənəd DS03-ə:
 
@@ -289,5 +294,3 @@ kimi prinsipləri öyrədir.
 
 DS03 bu sənəd olmadan işləyə bilməz.  
 Bu sənədlə isə — Samarkand Soul-un premium Shopify mühərrikinə çevrilir.
-
----
