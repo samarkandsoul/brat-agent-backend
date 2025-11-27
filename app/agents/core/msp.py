@@ -16,20 +16,6 @@ from app.llm.brat_gpt import brat_gpt_chat
 class MSP:
     """
     MSP (Main Service Processor) – central router for the Samarkand Soul bot.
-
-    It receives all `msp: ...` style commands from Telegram
-    and dispatches them to the correct agent, integration or tool.
-
-    Examples:
-      msp: mamos
-      msp: market: pet hair remover | US
-      msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master
-      msp: shopify: test
-      msp: ds05: Samarkand Soul Ikat Tablecloth | premium home textile | ...
-      msp: product: Samarkand Soul Ikat Tablecloth | warm beige ikat | 39.90 | women 28–45 EU/US
-      msp: image: Samarkand Soul Ikat Tablecloth | hero image for product page | warm beige, minimalist, family dinner
-      msp: gpt: Explain the Samarkand Soul brand in 3 sentences.
-      msp: tga: start
     """
 
     def __init__(self) -> None:
@@ -86,12 +72,6 @@ class MSP:
     #  MAMOS – Unified Brain
     # =========================
     def load_mamos(self) -> str:
-        """
-        Load the global MAMOS doctrine.
-
-        All agents should conceptually use this to understand
-        the Samarkand Soul mission, rules and discipline.
-        """
         return MAMOSLoader.load_mamos()
 
     # =========================
@@ -99,9 +79,6 @@ class MSP:
     # =========================
     @staticmethod
     def _strip_msp_prefix(raw_text: str) -> str:
-        """
-        Remove the 'msp:' prefix and trim whitespace.
-        """
         text = (raw_text or "").strip()
         if text.lower().startswith("msp:"):
             return text[4:].strip()
@@ -109,9 +86,6 @@ class MSP:
 
     @staticmethod
     def _split_once(body: str, sep: str = "|") -> Tuple[str, str]:
-        """
-        Split "a | b" format into two parts.
-        """
         parts = [p.strip() for p in body.split(sep, 1)]
         if len(parts) == 1:
             return parts[0], ""
@@ -121,25 +95,9 @@ class MSP:
     #  TGA – TikTok Growth Agent helpers
     # =========================
     def build_tga_preview_payloads(self) -> List[Dict[str, Any]]:
-        """
-        Build Telegram-ready preview payloads for the TikTok Growth Agent.
-
-        The external bot layer can use it like:
-
-            payloads = msp.build_tga_preview_payloads()
-            for p in payloads:
-                bot.send_message(chat_id, **p)
-        """
         return self.tga.build_telegram_preview_payloads()
 
     def process_callback(self, callback_data: str) -> Optional[str]:
-        """
-        Router for Telegram callback_data.
-
-        Currently supports only TGA callbacks:
-          - tga_approve:<draft_id>
-          - tga_reject:<draft_id>
-        """
         if not callback_data:
             return None
 
@@ -159,9 +117,6 @@ class MSP:
     #  Main entrypoint (text messages)
     # =========================
     def process(self, raw_text: str) -> str:
-        """
-        Main entrypoint for ALL MSP *text* commands coming from Telegram.
-        """
         if not raw_text:
             return "MSP error: empty message."
 
@@ -176,7 +131,6 @@ class MSP:
         # ==========================================================
         if lowered.startswith("mamos"):
             doc = self.load_mamos()
-            # Telegram has limits – show only a preview; full text lives in repo
             preview = doc[:3500]
             return "📜 MAMOS — Samarkand Soul Doctrine (preview):\n\n" + preview
 
@@ -253,9 +207,6 @@ class MSP:
         # 3) DS-02 DRIVE AGENT (real logical layer)
         # ==========================================================
         if lowered.startswith("drive"):
-            # Supported formats:
-            #   msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master
-            #   msp: drive SamarkandSoulSystem / DS-02 - Drive-Agent-Lab
             body = text
             if lowered.startswith("drive:"):
                 body = text[len("drive:"):].strip()
@@ -278,16 +229,6 @@ class MSP:
 
         # ==========================================================
         # 3.5) SHOPIFY AGENT (DS03) — real API integration
-        # ----------------------------------------------------------
-        # Examples:
-        #   msp: shopify: test
-        #   msp: shopify: demo
-        #   msp: shopify: comingsoon
-        #   msp: shopify: add | Title | Price | OptionalImageURL
-        #   msp: shopify: collection | Premium Tablecloths
-        #   msp: shopify: structure_basic
-        #   msp: shopify: update_page | handle | instructions
-        #   msp: shopify: autods | niche
         # ==========================================================
         if lowered.startswith("shopify:"):
             raw_body = text[len("shopify:"):].strip()
@@ -302,8 +243,8 @@ class MSP:
                     create_product_from_prompt,
                     create_collection,
                     setup_basic_store_structure,
-                    update_page_html,
                     autods_search_stub,
+                    overwrite_page_html,
                 )
             except Exception as e:  # pylint: disable=broad-except
                 return f"MSP error: Shopify integration import failed: {e}"
@@ -332,8 +273,6 @@ class MSP:
 
             # --- add product via text prompt ---
             if lowered_body.startswith("add"):
-                # Expected format:
-                #   add | Title | Price | OptionalImageURL
                 after = raw_body[3:].strip()
                 if after.startswith("|"):
                     after = after[1:].strip()
@@ -341,8 +280,6 @@ class MSP:
 
             # --- create collection ---
             if lowered_body.startswith("collection"):
-                # Format:
-                #   collection | Premium Tablecloths
                 after = raw_body[len("collection"):].strip()
                 if after.startswith("|"):
                     after = after[1:].strip()
@@ -352,61 +289,59 @@ class MSP:
             if lowered_body.startswith("structure_basic"):
                 return setup_basic_store_structure()
 
-            # --- update specific page with GPT-generated HTML ---
+            # --- update single page via GPT (legal / about / shipping vs) ---
             if lowered_body.startswith("update_page"):
                 # Format:
-                #   update_page | handle | instructions / policy brief
+                #   msp: shopify: update_page | privacy-policy | Brief text...
                 after = raw_body[len("update_page"):].strip()
                 if after.startswith("|"):
                     after = after[1:].strip()
 
-                handle, prompt = self._split_once(after, "|")
-
-                handle = handle.strip()
-                prompt = prompt.strip()
-
-                if not handle or not prompt:
+                if not after:
                     return (
-                        "MSP error: update_page format is invalid.\n"
-                        "Use:\n"
-                        "  msp: shopify: update_page | handle | instructions\n"
+                        "MSP error: update_page body is empty.\n"
+                        "Format:\n"
+                        "  msp: shopify: update_page | privacy-policy | Brief for GPT\n"
                         "Example:\n"
                         "  msp: shopify: update_page | privacy-policy | "
-                        "Premium Privacy Policy text for Samarkand Soul. Generate full legal policy..."
+                        "Premium Privacy Policy text for Samarkand Soul (handmade home textiles brand). "
+                        "Generate a full legal privacy policy compliant with Shopify, covering customer data, "
+                        "cookies, payments, returns, GDPR, CCPA, and international commerce."
                     )
 
-                # Build LLM prompt for HTML body
-                llm_prompt = (
-                    "You are the copywriter and legal-aware content writer for the "
-                    "Samarkand Soul Shopify store (premium handmade home textiles).\n\n"
-                    "TASK:\n"
-                    f"- Write the FULL HTML body for the Shopify page with handle '{handle}'.\n"
-                    "- Use clean HTML with <h2>, <h3>, <p>, <ul>, <li> tags only.\n"
-                    "- Do NOT include <html>, <head>, <body> tags.\n"
-                    "- Do NOT add any explanations before or after the HTML.\n"
-                    "- The brand tone: calm luxury, honest, transparent, premium.\n\n"
-                    "CONTENT INSTRUCTIONS:\n"
-                    f"{prompt}\n\n"
-                    "Output ONLY valid HTML."
-                )
+                parts = [p.strip() for p in after.split("|", 1)]
+                if len(parts) < 2 or not parts[0] or not parts[1]:
+                    return (
+                        "MSP error: update_page requires: handle | brief.\n"
+                        "Example:\n"
+                        "  msp: shopify: update_page | terms-of-service | Full legal ToS for Samarkand Soul..."
+                    )
 
+                handle = parts[0].lower()
+                brief = parts[1]
+
+                # Generate HTML with GPT
                 try:
-                    body_html = brat_gpt_chat(
-                        user_prompt=llm_prompt,
+                    gpt_prompt = (
+                        "You are the official content & legal page writer for the Samarkand Soul Shopify store.\n"
+                        f"Page handle: {handle}\n"
+                        "Write clean HTML content using <h2>, <h3>, <p>, <ul>, <li> tags.\n"
+                        "Do NOT include <html>, <head> or <body> tags – only inner HTML.\n"
+                        "The brand: Samarkand Soul – premium, calm luxury, handmade-style home textiles.\n"
+                        f"Brief from commander:\n{brief}\n\n"
+                        "Return ONLY the HTML, nothing else."
+                    )
+                    html = brat_gpt_chat(
+                        user_prompt=gpt_prompt,
                         agent_role="Samarkand Soul Shopify Page Writer",
                     )
                 except Exception as e:  # pylint: disable=broad-except
-                    return f"MSP error: GPT failed while generating page HTML: {e}"
+                    return f"MSP error: GPT bridge failed inside update_page: {e}"
 
-                try:
-                    return update_page_html(handle=handle, body_html=body_html)
-                except Exception as e:  # pylint: disable=broad-except
-                    return f"MSP error: update_page_html failed: {e}"
+                return overwrite_page_html(handle, html)
 
             # --- AutoDS stub (future real integration) ---
             if lowered_body.startswith("autods"):
-                # Format:
-                #   autods | niche name
                 after = raw_body[len("autods"):].strip()
                 if after.startswith("|"):
                     after = after[1:].strip()
@@ -421,16 +356,12 @@ class MSP:
                 "  • msp: shopify: add | Title | Price | OptionalImageURL\n"
                 "  • msp: shopify: collection | Collection Name\n"
                 "  • msp: shopify: structure_basic\n"
-                "  • msp: shopify: update_page | handle | instructions\n"
+                "  • msp: shopify: update_page | handle | brief\n"
                 "  • msp: shopify: autods | niche\n"
             )
 
         # ==========================================================
         # 3.8) DS-21 PRODUCT AUTO CREATOR
-        # ----------------------------------------------------------
-        # Examples:
-        #   msp: product: Samarkand Soul Ikat Tablecloth | warm beige ikat, minimalist | 39.90 | women 28–45 in EU & US
-        #   msp: ds21: Blue Ikat Tablecloth | deep blue pattern | 44.90 | gift-ready premium packaging
         # ==========================================================
         if lowered.startswith("product:") or lowered.startswith("ds21:"):
             if lowered.startswith("product:"):
@@ -476,16 +407,11 @@ class MSP:
 
             try:
                 return creator.create_full_product(idea)
-            except Exception as e:  # pylint: disable-broad-except
+            except Exception as e:  # pylint: disable=broad-except
                 return f"MSP error: DS-21 processing error: {e}"
 
         # ==========================================================
         # 3.9) DS-22 IMAGE AUTO AGENT
-        # ----------------------------------------------------------
-        # Generates AI image prompts, shot list, filenames, alt-text
-        # Examples:
-        #   msp: image: Samarkand Soul Ikat Tablecloth | hero image for product page | warm beige, minimalist, family dinner
-        #   msp: ds22: Blue Ikat Tablecloth | lifestyle shots for TikTok | cozy evening, candles, premium home textile
         # ==========================================================
         if lowered.startswith("image:") or lowered.startswith("ds22:"):
             if lowered.startswith("image:"):
@@ -535,12 +461,7 @@ class MSP:
                 return f"MSP error: DS-22 processing error: {e}"
 
         # ==========================================================
-        # 3.6) DS-05 PRODUCT PAGE COPYWRITER (real LLM via AgentBrain)
-        # ----------------------------------------------------------
-        # Example:
-        #   msp: ds05: Samarkand Soul Ikat Tablecloth | premium home textile | \
-        #         modern minimalist women in Europe | gift-ready, table as ritual | \
-        #         mention Samarkand spirit and premium packaging
+        # 3.6) DS-05 PRODUCT PAGE COPYWRITER
         # ==========================================================
         if lowered.startswith("ds05:"):
             body = text[len("ds05:"):].strip()
@@ -549,9 +470,6 @@ class MSP:
                     "MSP error: ds05 body is empty.\n"
                     "Format:\n"
                     "  msp: ds05: Product name | Niche | Target customer | Main benefit | Extra notes\n"
-                    "Example:\n"
-                    "  msp: ds05: Samarkand Soul Ikat Tablecloth | premium home textile | "
-                    "modern minimalist women in Europe | gift-ready, table as a ritual"
                 )
 
             try:
@@ -568,10 +486,6 @@ class MSP:
 
         # ==========================================================
         # 3.7) GPT / MAMOS-aware General Chat
-        # ----------------------------------------------------------
-        # Examples:
-        #   msp: gpt: What is the Samarkand Soul brand?
-        #   msp: chat: Explain our mission in 3 sentences.
         # ==========================================================
         if lowered.startswith("gpt:") or lowered.startswith("chat:"):
             if lowered.startswith("gpt:"):
@@ -602,7 +516,6 @@ class MSP:
             key = prefix.strip().lower()
             query = body.strip() or "(empty query)"
 
-            # ----- DS agents -----
             if key in self.ds_labels:
                 label = self.ds_labels[key]
                 return (
@@ -612,7 +525,6 @@ class MSP:
                     "Later it will use real LLM + integrations. 🧠"
                 )
 
-            # ----- LIFE agents -----
             if key in self.life_labels:
                 label = self.life_labels[key]
                 return (
@@ -622,7 +534,6 @@ class MSP:
                     "personal plans and recommendations."
                 )
 
-            # ----- SYS agents -----
             if key in self.sys_labels:
                 label = self.sys_labels[key]
                 return (
