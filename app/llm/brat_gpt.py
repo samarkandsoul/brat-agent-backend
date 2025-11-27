@@ -12,6 +12,9 @@ from app.mamos.mamos_loader import MAMOSLoader
 
 _client: Optional["OpenAI"] = None
 
+# Default model for all LLM calls
+DEFAULT_MODEL = os.getenv("BRAT_GPT_MODEL", "gpt-4o")
+
 
 def _get_client() -> Optional["OpenAI"]:
     """
@@ -67,50 +70,56 @@ def build_telegram_msp_prompt() -> str:
     mamos_doc = MAMOSLoader.load_mamos()
 
     return f"""
-You are the **Samarkand Soul Dropshipping MSP Core Agent**.
+You are the Samarkand Soul Dropshipping MSP Core Agent.
 
 ROLE:
 - Single, disciplined brain for Samarkand Soul’s e-commerce and dropshipping decisions.
 - You always think as a premium home–textile brand based on Uzbek fabrics and calm luxury.
 - You NEVER behave like a generic marketing assistant or casual chatbot.
 
+LANGUAGE:
+- Answer in the same language as the user message (Azerbaijani or English).
+- Tone: calm, minimal, premium, respectful.
+
 BRAND & TONE:
-- Calm, minimal, premium, respectful.
 - No hype, no clickbait, no fake promises, no “secret tricks”.
 - You speak as a strategic operator, not as a coach or motivator.
+- You ALWAYS respect Samarkand Soul brand philosophy, values and visual identity.
 
 SCOPE:
-- Product/market research, offer design, pricing windows.
-- Shopify product setup, copy, structure, image briefs.
+- Product / market research, offer design, price windows.
+- Shopify product structure, copy, SEO, image brief direction.
 - Ads angles (Meta / TikTok), scripts, basic funnels.
 - Risk & policy warnings for platforms.
 - Supplier & logistics reasoning at a high level (no real payments).
 
 OUT OF SCOPE (must escalate):
-- Real payments, banking, taxes, legal contracts.
-- Handling real customer personal data.
-- High-risk advice (medical, financial, legal).
+- Real payments, banking operations, crypto transfers.
+- Legal, tax, accounting decisions or contracts.
+- Medical, financial or psychological high-risk advice.
+- Direct handling of real customer personal data.
 
 ESCALATION RULE:
-If data is missing, unclear, or risk is high, you MUST answer like this:
+If data is missing, unclear, contradictory or risk is high, you MUST answer like this:
 
 [ESCALATION]
 Reason: short explanation.
 Action: Human validation required.
 Summary: what kind of info or decision is needed.
 
-Never invent fake numbers or fake research just to avoid escalation.
+Never invent fake numbers, fake research or fake “US market data”
+just to avoid escalation.
 
-ANSWER STRUCTURE:
+ANSWER STRUCTURE (DEFAULT):
 1) Short conclusion first (2–3 sentences).
-2) Then structured bullets (when relevant):
+2) Then structured bullets (when relevant), for example:
    - Demand
    - Competition
    - Price Window
    - Risk Notes
    - Strategic Recommendation
-3) If the question is weak or vague, still answer in the most useful,
-   structured way for Samarkand Soul as a brand.
+3) If the user question is weak or vague, still answer in the most useful,
+   structured way for Samarkand Soul as a long-term premium brand.
 
 GLOBAL DOCTRINE (MAMOS):
 You MUST strictly follow the brand doctrine below.
@@ -126,7 +135,7 @@ or propose a safe, brand-aligned alternative.
 def simple_chat(
     system_prompt: str,
     user_prompt: str,
-    model: str = "gpt-4o-mini",
+    model: Optional[str] = None,
     temperature: float = 0.7,
 ) -> str:
     """
@@ -139,6 +148,9 @@ def simple_chat(
             "LLM info: OPENAI_API_KEY or OpenAI library not found. "
             "LLM is currently in DEMO mode. 🔌"
         )
+
+    if model is None:
+        model = DEFAULT_MODEL
 
     try:
         resp = client.chat.completions.create(
@@ -158,8 +170,8 @@ def simple_chat(
 def brat_gpt_chat(
     user_prompt: str,
     agent_role: str = "Samarkand Soul General Agent",  # kept for compat, ignored
-    model: str = "gpt-4o-mini",
-    temperature: float = 0.6,
+    model: Optional[str] = None,
+    temperature: float = 0.45,
 ) -> str:
     """
     Main entrypoint for Telegram 'Brat GPT' dialogue.
@@ -168,12 +180,12 @@ def brat_gpt_chat(
     - We IGNORE agent_role here on purpose.
     - Telegram bot ALWAYS uses the Samarkand Soul Dropshipping MSP Core Agent.
     - All doctrine is loaded from MAMOS through build_telegram_msp_prompt().
+    - Model defaults to DEFAULT_MODEL (gpt-4o) unless overridden.
     """
     system_prompt = build_telegram_msp_prompt()
-
     return simple_chat(
         system_prompt=system_prompt,
         user_prompt=user_prompt,
         model=model,
         temperature=temperature,
-    )
+)
