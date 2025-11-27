@@ -401,7 +401,7 @@ def create_collection(name: str) -> str:
 
 
 # ==========================================================
-#  BASIC STORE STRUCTURE  (msp: shopify: structure_basic)
+#  PAGES & BASIC STORE STRUCTURE  (msp: shopify: structure_basic)
 # ==========================================================
 
 def _create_or_update_page(title: str, handle: str, body_html: str) -> str:
@@ -557,6 +557,53 @@ products, you can reach us via email or the contact form on this page.</p>
 
 
 # ==========================================================
+#  UPDATE PAGE FROM MSP (msp: shopify: update_page)
+# ==========================================================
+
+PAGE_TITLE_MAP = {
+    "about-samarkand-soul": "About Samarkand Soul",
+    "shipping-and-returns": "Shipping & Returns",
+    "privacy-policy": "Privacy Policy",
+    "terms-of-service": "Terms of Service",
+    "refund-policy": "Refund Policy",
+}
+
+
+def update_page_html(handle: str, body_html: str, title: Optional[str] = None) -> str:
+    """
+    Create or update a Shopify Page by handle with given HTML.
+
+    MSP-dən istifadə:
+      msp: shopify: update_page | handle | prompt text...
+    """
+    try:
+        _ensure_config()
+
+        handle = (handle or "").strip()
+        if not handle:
+            return "MSP error: update_page_html: empty handle."
+
+        page_title = title or PAGE_TITLE_MAP.get(
+            handle,
+            handle.replace("-", " ").title(),
+        )
+
+        status = _create_or_update_page(
+            title=page_title,
+            handle=handle,
+            body_html=body_html,
+        )
+
+        return (
+            f"✅ Shopify page {status}.\n"
+            f"Handle: {handle}\n"
+            f"Title: {page_title}"
+        )
+    except Exception as e:  # pylint: disable=broad-except
+        return f"MSP error: update_page_html exception: {e}"
+
+
+# ==========================================================
 #  AUTODS STUBS (FUTURE INTEGRATION)
 # ==========================================================
 
@@ -581,4 +628,4 @@ def autods_search_stub(niche: str) -> str:
         "Action: Configure AutoDS API (endpoint + token) in backend.\n"
         "Summary: Once AutoDS API is available, MSP can auto-search products "
         f"for niche: {niche}"
-        )
+)
