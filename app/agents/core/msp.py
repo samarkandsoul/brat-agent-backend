@@ -286,6 +286,7 @@ class MSP:
         #   msp: shopify: add | Title | Price | OptionalImageURL
         #   msp: shopify: collection | Premium Tablecloths
         #   msp: shopify: structure_basic
+        #   msp: shopify: update_page | handle | instructions
         #   msp: shopify: autods | niche
         # ==========================================================
         if lowered.startswith("shopify:"):
@@ -301,6 +302,7 @@ class MSP:
                     create_product_from_prompt,
                     create_collection,
                     setup_basic_store_structure,
+                    update_page_html,
                     autods_search_stub,
                 )
             except Exception as e:  # pylint: disable=broad-except
@@ -350,6 +352,57 @@ class MSP:
             if lowered_body.startswith("structure_basic"):
                 return setup_basic_store_structure()
 
+            # --- update specific page with GPT-generated HTML ---
+            if lowered_body.startswith("update_page"):
+                # Format:
+                #   update_page | handle | instructions / policy brief
+                after = raw_body[len("update_page"):].strip()
+                if after.startswith("|"):
+                    after = after[1:].strip()
+
+                handle, prompt = self._split_once(after, "|")
+
+                handle = handle.strip()
+                prompt = prompt.strip()
+
+                if not handle or not prompt:
+                    return (
+                        "MSP error: update_page format is invalid.\n"
+                        "Use:\n"
+                        "  msp: shopify: update_page | handle | instructions\n"
+                        "Example:\n"
+                        "  msp: shopify: update_page | privacy-policy | "
+                        "Premium Privacy Policy text for Samarkand Soul. Generate full legal policy..."
+                    )
+
+                # Build LLM prompt for HTML body
+                llm_prompt = (
+                    "You are the copywriter and legal-aware content writer for the "
+                    "Samarkand Soul Shopify store (premium handmade home textiles).\n\n"
+                    "TASK:\n"
+                    f"- Write the FULL HTML body for the Shopify page with handle '{handle}'.\n"
+                    "- Use clean HTML with <h2>, <h3>, <p>, <ul>, <li> tags only.\n"
+                    "- Do NOT include <html>, <head>, <body> tags.\n"
+                    "- Do NOT add any explanations before or after the HTML.\n"
+                    "- The brand tone: calm luxury, honest, transparent, premium.\n\n"
+                    "CONTENT INSTRUCTIONS:\n"
+                    f"{prompt}\n\n"
+                    "Output ONLY valid HTML."
+                )
+
+                try:
+                    body_html = brat_gpt_chat(
+                        user_prompt=llm_prompt,
+                        agent_role="Samarkand Soul Shopify Page Writer",
+                    )
+                except Exception as e:  # pylint: disable=broad-except
+                    return f"MSP error: GPT failed while generating page HTML: {e}"
+
+                try:
+                    return update_page_html(handle=handle, body_html=body_html)
+                except Exception as e:  # pylint: disable=broad-except
+                    return f"MSP error: update_page_html failed: {e}"
+
             # --- AutoDS stub (future real integration) ---
             if lowered_body.startswith("autods"):
                 # Format:
@@ -368,6 +421,7 @@ class MSP:
                 "  • msp: shopify: add | Title | Price | OptionalImageURL\n"
                 "  • msp: shopify: collection | Collection Name\n"
                 "  • msp: shopify: structure_basic\n"
+                "  • msp: shopify: update_page | handle | instructions\n"
                 "  • msp: shopify: autods | niche\n"
             )
 
@@ -422,7 +476,7 @@ class MSP:
 
             try:
                 return creator.create_full_product(idea)
-            except Exception as e:  # pylint: disable=broad-except
+            except Exception as e:  # pylint: disable-broad-except
                 return f"MSP error: DS-21 processing error: {e}"
 
         # ==========================================================
@@ -602,7 +656,7 @@ class MSP:
             "  • msp: image: Samarkand Soul Ikat Tablecloth | hero image for product page | warm beige, minimalist, family dinner\n"
             "  • msp: life01: give me a health & habit plan\n"
             "  • msp: sys01: explain the system knowledge base\n"
-            "  • msp: shopify: test / demo / comingsoon / add / collection / structure_basic / autods\n"
+            "  • msp: shopify: test / demo / comingsoon / add / collection / structure_basic / update_page / autods\n"
             "  • msp: gpt: Explain the Samarkand Soul brand in 3 sentences\n"
             "  • msp: tga: start  (TikTok Growth Agent daily cycle)\n"
             )
