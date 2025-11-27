@@ -104,15 +104,6 @@ def create_demo_product(spec: ShopifyDemoProductSpec) -> str:
 
     Telegram:
       msp: shopify: demo
-
-    MSP bu funksiyaya belə spec verə bilər:
-      ShopifyDemoProductSpec(
-          title="Samarkand Soul Demo Tablecloth",
-          description="<p>Demo product for testing.</p>",
-          price="39.90",
-          tags=["samarkand soul", "demo"],
-          image_url="https://..."
-      )
     """
     try:
         _ensure_config()
@@ -401,7 +392,7 @@ def create_collection(name: str) -> str:
 
 
 # ==========================================================
-#  PAGES & BASIC STORE STRUCTURE  (msp: shopify: structure_basic)
+#  BASIC STORE STRUCTURE  (msp: shopify: structure_basic)
 # ==========================================================
 
 def _create_or_update_page(title: str, handle: str, body_html: str) -> str:
@@ -557,70 +548,12 @@ products, you can reach us via email or the contact form on this page.</p>
 
 
 # ==========================================================
-#  UPDATE PAGE FROM MSP (msp: shopify: update_page)
-# ==========================================================
-
-PAGE_TITLE_MAP = {
-    "about-samarkand-soul": "About Samarkand Soul",
-    "shipping-and-returns": "Shipping & Returns",
-    "privacy-policy": "Privacy Policy",
-    "terms-of-service": "Terms of Service",
-    "refund-policy": "Refund Policy",
-}
-
-
-def update_page_html(handle: str, body_html: str, title: Optional[str] = None) -> str:
-    """
-    Create or update a Shopify Page by handle with given HTML.
-
-    MSP-dən istifadə:
-      msp: shopify: update_page | handle | prompt text...
-    """
-    try:
-        _ensure_config()
-
-        handle = (handle or "").strip()
-        if not handle:
-            return "MSP error: update_page_html: empty handle."
-
-        page_title = title or PAGE_TITLE_MAP.get(
-            handle,
-            handle.replace("-", " ").title(),
-        )
-
-        status = _create_or_update_page(
-            title=page_title,
-            handle=handle,
-            body_html=body_html,
-        )
-
-        return (
-            f"✅ Shopify page {status}.\n"
-            f"Handle: {handle}\n"
-            f"Title: {page_title}"
-        )
-    except Exception as e:  # pylint: disable=broad-except
-        return f"MSP error: update_page_html exception: {e}"
-
-
-# ==========================================================
 #  AUTODS STUBS (FUTURE INTEGRATION)
 # ==========================================================
 
 def autods_search_stub(niche: str) -> str:
     """
     Placeholder for AutoDS product search.
-
-    Telegram (gələcəkdə):
-      msp: autods: search | niche name
-
-    HAZIRDA:
-      - Real AutoDS API inteqrasiyası yoxdur.
-      - Bu funksiya sadəcə ESCALATION qaytarır.
-
-    Gələcəkdə:
-      - AutoDS API endpoint + API key əlavə ediləcək.
-      - Buradan AutoDS-a sorğu gedib nəticələr Telegram-da göstəriləcək.
     """
     return (
         "[ESCALATION]\n"
@@ -628,4 +561,50 @@ def autods_search_stub(niche: str) -> str:
         "Action: Configure AutoDS API (endpoint + token) in backend.\n"
         "Summary: Once AutoDS API is available, MSP can auto-search products "
         f"for niche: {niche}"
-)
+    )
+
+
+# ==========================================================
+#  SINGLE PAGE UPDATE (used by: msp: shopify: update_page | handle | BODY_HTML)
+# ==========================================================
+
+_PAGE_TITLE_MAP = {
+    "privacy-policy": "Privacy Policy",
+    "terms-of-service": "Terms of Service",
+    "shipping-and-returns": "Shipping & Returns",
+    "about-samarkand-soul": "About Samarkand Soul",
+    "contact": "Contact",
+}
+
+
+def overwrite_page_html(handle: str, body_html: str, title: Optional[str] = None) -> str:
+    """
+    Overwrite or create a single Shopify Page by handle.
+
+    Used by MSP bridge:
+      msp: shopify: update_page | privacy-policy | <HTML or generated text>
+
+    MSP tərəfi GPT ilə HTML generasiya edib bura ötürür.
+    """
+    try:
+        _ensure_config()
+        h = (handle or "").strip().lower()
+        if not h:
+            return "MSP error: overwrite_page_html: handle is empty."
+
+        page_title = title or _PAGE_TITLE_MAP.get(h) or h.replace("-", " ").title()
+
+        result = _create_or_update_page(
+            title=page_title,
+            handle=h,
+            body_html=body_html,
+        )
+
+        return (
+            "✅ Page updated in Shopify.\n"
+            f"Handle: {h}\n"
+            f"Title: {page_title}\n"
+            f"Result: {result}"
+        )
+    except Exception as e:  # pylint: disable=broad-except
+        return f"MSP error: overwrite_page_html exception: {e}"
