@@ -75,15 +75,12 @@ def test_shopify_connection() -> str:
             f"Shop name: {name}\n"
             f"Domain: {domain}"
         )
-    except Exception as e:  # pylint: disable=broad-except
+    except Exception as e:
         return f"MSP error: Shopify connection exception: {e}"
 
 
 def create_demo_product(spec: ShopifyDemoProductSpec) -> str:
-    """
-    Create a simple demo product in Shopify.
-    Called from MSP with `msp: shopify: demo`.
-    """
+    """Create a simple demo product in Shopify."""
     try:
         _ensure_config()
 
@@ -129,36 +126,24 @@ def create_demo_product(spec: ShopifyDemoProductSpec) -> str:
             f"ID: {pid}\n"
             f"Handle: {handle}\n"
             f"Admin URL: {admin_url}\n"
-            f"Storefront URL (if published later): {storefront_url}"
+            f"Storefront URL: {storefront_url}"
         )
 
-    except Exception as e:  # pylint: disable=broad-except
+    except Exception as e:
         return f"MSP error: Demo product exception: {e}"
 
 
 # ==========================================================
 #  COMING SOON PAGE / PRODUCT
-#  Trigger:  msp: shopify: comingsoon
 # ==========================================================
 def setup_coming_soon_page() -> str:
-    """
-    Creates (or reuses) a 'Coming Soon' product for Samarkand Soul.
-
-    Goal:
-      - Title: 'Samarkand Soul — Coming Soon'
-      - Handle: 'samarkand-soul-coming-soon'
-      - Status: active (visible in online store)
-      - Price: 0 (informational product)
-    """
+    """Creates or updates the 'Coming Soon' product."""
     try:
         _ensure_config()
 
         title = "Samarkand Soul — Coming Soon"
         handle = "samarkand-soul-coming-soon"
 
-        # 1) Try to find existing product by handle using REST search.
-        # Shopify REST doesn't filter directly by handle, so we search by title
-        # and then match handle in Python side. It is enough for our simple use-case.
         search_url = _shopify_url("products.json")
         resp = requests.get(
             search_url,
@@ -167,23 +152,18 @@ def setup_coming_soon_page() -> str:
             timeout=20,
         )
 
-        if resp.status_code not in (200, 201):
-            # we won't fail hard, just log and continue creating a new one
-            existing_product = None
-        else:
+        existing_product = None
+        if resp.status_code in (200, 201):
             items = resp.json().get("products", [])
-            existing_product = None
             for p in items:
                 if p.get("handle") == handle or p.get("title") == title:
                     existing_product = p
                     break
 
-        # 2) Build payload (used for both create & update)
         body_html = """
             <p><strong>Samarkand Soul is coming soon.</strong></p>
-            <p>We are weaving the soul of Samarkand into modern home textiles:
-            premium tablecloths, minimalist design, deep storytelling.</p>
-            <p>Leave your email on the homepage to be the first to know when we launch.</p>
+            <p>Premium handmade home textiles inspired by Samarkand.</p>
+            <p>Leave your email to be the first to know.</p>
         """
 
         product_data = {
@@ -193,15 +173,9 @@ def setup_coming_soon_page() -> str:
             "status": "active",
             "published": True,
             "tags": ["coming-soon", "samarkand soul", "launch"],
-            "variants": [
-                {
-                    "price": "0.00",
-                    "sku": "COMING-SOON",
-                }
-            ],
+            "variants": [{"price": "0.00", "sku": "COMING-SOON"}],
         }
 
-        # 3) Create or update
         if existing_product:
             pid = existing_product.get("id")
             update_url = _shopify_url(f"products/{pid}.json")
@@ -212,16 +186,15 @@ def setup_coming_soon_page() -> str:
                 data=json.dumps(payload),
                 timeout=20,
             )
-
+            action = "updated"
             if resp2.status_code not in (200, 201):
                 return (
-                    "MSP error: Coming Soon product UPDATE failed.\n"
+                    "MSP error: Coming Soon UPDATE failed.\n"
                     f"Status: {resp2.status_code}\n"
                     f"Body: {resp2.text[:800]}"
                 )
-
             product = resp2.json().get("product", {})
-            action = "updated"
+
         else:
             create_url = _shopify_url("products.json")
             payload = {"product": product_data}
@@ -231,56 +204,45 @@ def setup_coming_soon_page() -> str:
                 data=json.dumps(payload),
                 timeout=20,
             )
-
+            action = "created"
             if resp2.status_code not in (200, 201):
                 return (
-                    "MSP error: Coming Soon product CREATION failed.\n"
+                    "MSP error: Coming Soon CREATION failed.\n"
                     f"Status: {resp2.status_code}\n"
                     f"Body: {resp2.text[:800]}"
                 )
-
             product = resp2.json().get("product", {})
-            action = "created"
 
         pid = product.get("id")
-        handle = product.get("handle", handle)
-        admin_url = f"/admin/products/{pid}" if pid else "unknown"
-        storefront_url = f"/products/{handle}" if handle else "unknown"
+        storefront_url = f"/products/{handle}"
 
         return (
-            f"✅ Coming Soon product {action} in Shopify.\n"
+            f"✅ Coming Soon product {action}.\n"
             f"ID: {pid}\n"
-            f"Handle: {handle}\n"
-            f"Admin URL: {admin_url}\n"
             f"Storefront URL: {storefront_url}"
         )
 
-    except Exception as e:  # pylint: disable=broad-except
+    except Exception as e:
         return f"MSP error: setup_coming_soon_page exception: {e}"
 
 
 # ==========================================================
-#  Optional helper: create product from free-form prompt
-#  Trigger: msp: shopify: add | Title | Price | OptionalImageURL
+#  PRODUCT CREATION FROM PROMPT
 # ==========================================================
 def create_product_from_prompt(raw_prompt: str) -> str:
-    """
-    Very lightweight helper: parse 'Title | Price | OptionalImageURL'
-    and create a simple active product.
-    """
+    """Parse: Title | Price | OptionalImageURL"""
     try:
         _ensure_config()
 
         parts = [p.strip() for p in raw_prompt.split("|")]
         if len(parts) < 2:
             return (
-                "MSP error: Invalid format for 'shopify: add'.\n"
+                "MSP error: Invalid format.\n"
                 "Use: msp: shopify: add | Title | Price | OptionalImageURL"
             )
 
-        title = parts[0]
-        price = parts[1]
-        image_url = parts[2] if len(parts) > 2 and parts[2] else None
+        title, price = parts[0], parts[1]
+        image_url = parts[2] if len(parts) > 2 else None
 
         payload = {
             "product": {
@@ -310,45 +272,31 @@ def create_product_from_prompt(raw_prompt: str) -> str:
         product = resp.json().get("product", {})
         pid = product.get("id")
         handle = product.get("handle")
-        admin_url = f"/admin/products/{pid}" if pid else "unknown"
-        storefront_url = f"/products/{handle}" if handle else "unknown"
 
         return (
-            "✅ Product created in Shopify.\n"
-            f"Title: {title}\n"
-            f"Price: {price}\n"
+            "✅ Product created.\n"
             f"ID: {pid}\n"
-            f"Admin URL: {admin_url}\n"
-            f"Storefront URL: {storefront_url}"
+            f"Handle: {handle}"
         )
 
-    except Exception as e:  # pylint: disable=broad-except
+    except Exception as e:
         return f"MSP error: create_product_from_prompt exception: {e}"
 
 
 # ==========================================================
-#  Optional: collection helper
-#  Trigger: msp: shopify: collection | Collection Name
+#  COLLECTION CREATION
 # ==========================================================
 def create_collection(name: str) -> str:
-    """
-    Creates a manual collection with the given name.
-    """
+    """Creates a manual collection."""
     try:
         _ensure_config()
 
-        payload = {
-            "custom_collection": {
-                "title": name,
-                "published": True,
-            }
-        }
-
+        payload = {"custom_collection": {"title": name, "published": True}}
         url = _shopify_url("custom_collections.json")
+
         resp = requests.post(
             url, headers=_shopify_headers(), data=json.dumps(payload), timeout=20
         )
-
         if resp.status_code not in (200, 201):
             return (
                 "MSP error: Collection creation failed.\n"
@@ -357,15 +305,175 @@ def create_collection(name: str) -> str:
             )
 
         coll = resp.json().get("custom_collection", {})
-        cid = coll.get("id")
-        handle = coll.get("handle")
+        return f"✅ Collection created: {coll.get('title')} (ID: {coll.get('id')})"
 
-        return (
-            "✅ Collection created in Shopify.\n"
-            f"Name: {name}\n"
-            f"ID: {cid}\n"
-            f"Handle: {handle}"
+    except Exception as e:
+        return f"MSP error: create_collection exception: {e}"
+
+
+# ==========================================================
+#  SAMARKAND SOUL DEMO STORE BOOTSTRAP
+# ==========================================================
+def _find_collection_by_title(title: str) -> Optional[dict]:
+    _ensure_config()
+    url = _shopify_url("custom_collections.json")
+    resp = requests.get(
+        url,
+        headers=_shopify_headers(),
+        params={"title": title, "limit": 50},
+        timeout=20,
+    )
+    if resp.status_code not in (200, 201):
+        return None
+
+    items = resp.json().get("custom_collections", [])
+    for coll in items:
+        if coll.get("title") == title:
+            return coll
+    return None
+
+
+def _create_or_get_collection_id(title: str) -> Optional[int]:
+    try:
+        existing = _find_collection_by_title(title)
+        if existing:
+            return existing.get("id")
+
+        payload = {"custom_collection": {"title": title, "published": True}}
+        url = _shopify_url("custom_collections.json")
+        resp = requests.post(
+            url,
+            headers=_shopify_headers(),
+            data=json.dumps(payload),
+            timeout=20,
+        )
+        if resp.status_code not in (200, 201):
+            return None
+
+        coll = resp.json().get("custom_collection", {})
+        return coll.get("id")
+
+    except Exception:
+        return None
+
+
+def _create_simple_product(title: str, price: str, body_html: str, tags=None):
+    try:
+        _ensure_config()
+        payload = {
+            "product": {
+                "title": title,
+                "body_html": body_html,
+                "status": "active",
+                "published": True,
+                "variants": [{"price": price}],
+                "tags": tags or ["samarkand soul", "demo"],
+            }
+        }
+        url = _shopify_url("products.json")
+        resp = requests.post(
+            url, headers=_shopify_headers(), data=json.dumps(payload), timeout=20
+        )
+        if resp.status_code not in (200, 201):
+            return None
+        return resp.json().get("product", {})
+    except Exception:
+        return None
+
+
+def _attach_product_to_collection(product_id: int, collection_id: int) -> bool:
+    try:
+        _ensure_config()
+        payload = {
+            "collect": {
+                "product_id": product_id,
+                "collection_id": collection_id,
+            }
+        }
+        url = _shopify_url("collects.json")
+        resp = requests.post(
+            url, headers=_shopify_headers(), data=json.dumps(payload), timeout=20
+        )
+        return resp.status_code in (200, 201)
+    except Exception:
+        return False
+
+
+def bootstrap_samarkand_demo_store() -> str:
+    try:
+        _ensure_config()
+
+        collection_title = "Samarkand Soul Tablecloths"
+        collection_id = _create_or_get_collection_id(collection_title)
+
+        if not collection_id:
+            return f"MSP error: Could not create/find '{collection_title}'."
+
+        demo_specs = [
+            {
+                "title": "Samarkand Soul Demo Tablecloth",
+                "price": "39.90",
+                "body": "<p>Demo tablecloth used for store layout testing.</p>",
+            },
+            {
+                "title": "Samarkand Soul Test Product",
+                "price": "39.90",
+                "body": "<p>Internal test product.</p>",
+            },
+            {
+                "title": "Samarkand Soul™ Ikat Tablecloth — Ritual of the Table",
+                "price": "39.90",
+                "body": "<p>Signature Ikat concept.</p>",
+            },
+        ]
+
+        list_url = _shopify_url("products.json")
+        resp_list = requests.get(
+            list_url,
+            headers=_shopify_headers(),
+            params={"limit": 250},
+            timeout=20,
         )
 
-    except Exception as e:  # pylint: disable=broad-except
-        return f"MSP error: create_collection exception: {e}"
+        existing_by_title = {}
+        if resp_list.status_code in (200, 201):
+            for p in resp_list.json().get("products", []):
+                existing_by_title[p.get("title", "").strip()] = p
+
+        created_products = []
+
+        for spec in demo_specs:
+            title = spec["title"]
+
+            if title in existing_by_title:
+                product = existing_by_title[title]
+            else:
+                product = _create_simple_product(
+                    title=title,
+                    price=spec["price"],
+                    body_html=spec["body"],
+                    tags=["samarkand soul", "demo"],
+                )
+                if not product:
+                    continue
+
+            pid = product.get("id")
+            if pid:
+                _attach_product_to_collection(pid, collection_id)
+                created_products.append(f"- {title} (ID: {pid})")
+
+        result = [
+            "✅ Samarkand Soul demo store bootstrap completed.",
+            f"Main collection ID: {collection_id}",
+        ]
+
+        if created_products:
+            result.append("Products:")
+            result.extend(created_products)
+        else:
+            result.append("Warning: No products were created or attached.")
+
+        return "\n".join(result)
+
+    except Exception as e:
+        return f"MSP error: bootstrap_samarkand_demo_store exception: {e}"
