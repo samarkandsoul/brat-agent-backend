@@ -16,10 +16,12 @@ from app.llm.brat_gpt import brat_gpt_chat
 class MSP:
     """
     MSP (Main Service Processor) – central router for the Samarkand Soul bot.
+
+    Bütün `msp: ...` tipli komandalar buradan keçir və uyğun agenta / inteqrasiyaya yönləndirilir.
     """
 
     def __init__(self) -> None:
-        # DS (Dropshipping System) agent labels (for generic demo handlers)
+        # DS (Dropshipping System) agent labels (demo handlerlər üçün)
         self.ds_labels = {
             "ds02": "DRIVE-AGENT",
             "ds03": "SHOPIFY-AGENT",
@@ -44,7 +46,7 @@ class MSP:
             "ds22": "IMAGE-AUTO-AGENT",
         }
 
-        # LIFE agents – protect the commander (health, time, clarity)
+        # LIFE agents – commander-i qoruyan təbəqə (sağlamlıq, zaman, fokus)
         self.life_labels = {
             "life01": "HEALTH & HABIT-COACH",
             "life02": "NUTRITION & MEAL PLANNER",
@@ -53,7 +55,7 @@ class MSP:
             "life05": "INFO & NEWS CURATOR",
         }
 
-        # SYS agents – keep the ecosystem clean and evolving
+        # SYS agents – sistemi təmiz və təkamüldə saxlayan təbəqə
         self.sys_labels = {
             "sys01": "KNOWLEDGE-LIBRARIAN",
             "sys02": "SECURITY & PRIVACY-GUARDIAN",
@@ -62,16 +64,19 @@ class MSP:
             "sys05": "FUTURE-ROADMAP & INNOVATION-PLANNER",
         }
 
-        # DS-02 Drive Agent – folder blueprints
+        # DS-02 Drive Agent – Google Drive qovluq blueprintləri
         self.drive = DriveAgent()
 
-        # TikTok Growth Agent (TGA) – content factory
+        # TikTok Growth Agent (TGA) – kontent fabriki
         self.tga = TikTokGrowthAgent()
 
     # =========================
     #  MAMOS – Unified Brain
     # =========================
     def load_mamos(self) -> str:
+        """
+        Samarkand Soul-un qlobal doktrinasını (MAMOS) yükləyir.
+        """
         return MAMOSLoader.load_mamos()
 
     # =========================
@@ -79,6 +84,9 @@ class MSP:
     # =========================
     @staticmethod
     def _strip_msp_prefix(raw_text: str) -> str:
+        """
+        'msp:' prefiksini təmizlə və whitespace-ləri kəs.
+        """
         text = (raw_text or "").strip()
         if text.lower().startswith("msp:"):
             return text[4:].strip()
@@ -86,6 +94,9 @@ class MSP:
 
     @staticmethod
     def _split_once(body: str, sep: str = "|") -> Tuple[str, str]:
+        """
+        "a | b" formatını iki hissəyə bölmək üçün helper.
+        """
         parts = [p.strip() for p in body.split(sep, 1)]
         if len(parts) == 1:
             return parts[0], ""
@@ -95,9 +106,15 @@ class MSP:
     #  TGA – TikTok Growth Agent helpers
     # =========================
     def build_tga_preview_payloads(self) -> List[Dict[str, Any]]:
+        """
+        Telegram üçün TGA preview payload-larını qaytarır.
+        """
         return self.tga.build_telegram_preview_payloads()
 
     def process_callback(self, callback_data: str) -> Optional[str]:
+        """
+        Telegram callback_data router-i (hal-hazırda yalnız TGA üçün).
+        """
         if not callback_data:
             return None
 
@@ -117,6 +134,9 @@ class MSP:
     #  Main entrypoint (text messages)
     # =========================
     def process(self, raw_text: str) -> str:
+        """
+        Telegram-dan gələn BÜTÜN mətni idarə edən əsas giriş nöqtəsi.
+        """
         if not raw_text:
             return "MSP error: empty message."
 
@@ -207,6 +227,9 @@ class MSP:
         # 3) DS-02 DRIVE AGENT (real logical layer)
         # ==========================================================
         if lowered.startswith("drive"):
+            # Nümunə:
+            #   msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master
+            #   msp: drive SamarkandSoulSystem / DS-02 - Drive-Agent-Lab
             body = text
             if lowered.startswith("drive:"):
                 body = text[len("drive:"):].strip()
@@ -273,6 +296,8 @@ class MSP:
 
             # --- add product via text prompt ---
             if lowered_body.startswith("add"):
+                # Format:
+                #   msp: shopify: add | Title | Price | OptionalImageURL
                 after = raw_body[3:].strip()
                 if after.startswith("|"):
                     after = after[1:].strip()
@@ -280,16 +305,17 @@ class MSP:
 
             # --- create collection ---
             if lowered_body.startswith("collection"):
+                #   msp: shopify: collection | Samarkand Soul Premium Tablecloths
                 after = raw_body[len("collection"):].strip()
                 if after.startswith("|"):
                     after = after[1:].strip()
                 return create_collection(after or "Samarkand Soul Collection")
 
-            # --- basic store structure (pages) ---
+            # --- basic store structure (core pages) ---
             if lowered_body.startswith("structure_basic"):
                 return setup_basic_store_structure()
 
-            # --- update single page via GPT (legal / about / shipping vs) ---
+            # --- update single page via GPT (legal / about / shipping və s.) ---
             if lowered_body.startswith("update_page"):
                 # Format:
                 #   msp: shopify: update_page | privacy-policy | Brief text...
@@ -320,7 +346,7 @@ class MSP:
                 handle = parts[0].lower()
                 brief = parts[1]
 
-                # Generate HTML with GPT
+                # HTML-i GPT ilə generasiya edirik
                 try:
                     gpt_prompt = (
                         "You are the official content & legal page writer for the Samarkand Soul Shopify store.\n"
@@ -340,14 +366,16 @@ class MSP:
 
                 return overwrite_page_html(handle, html)
 
-            # --- AutoDS stub (future real integration) ---
+            # --- AutoDS stub (gələcək real inteqrasiya üçün) ---
             if lowered_body.startswith("autods"):
+                #   msp: shopify: autods | tablecloth niche
                 after = raw_body[len("autods"):].strip()
                 if after.startswith("|"):
                     after = after[1:].strip()
                 niche = after or "general niche"
                 return autods_search_stub(niche)
 
+            # Default help for shopify agent
             return (
                 "Shopify agent commands:\n"
                 "  • msp: shopify: test\n"
@@ -516,6 +544,7 @@ class MSP:
             key = prefix.strip().lower()
             query = body.strip() or "(empty query)"
 
+            # ----- DS agents -----
             if key in self.ds_labels:
                 label = self.ds_labels[key]
                 return (
@@ -525,6 +554,7 @@ class MSP:
                     "Later it will use real LLM + integrations. 🧠"
                 )
 
+            # ----- LIFE agents -----
             if key in self.life_labels:
                 label = self.life_labels[key]
                 return (
@@ -534,6 +564,7 @@ class MSP:
                     "personal plans and recommendations."
                 )
 
+            # ----- SYS agents -----
             if key in self.sys_labels:
                 label = self.sys_labels[key]
                 return (
