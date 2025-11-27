@@ -1,5 +1,3 @@
-# app/main.py
-
 from fastapi import FastAPI
 from pydantic import BaseModel
 import os
@@ -7,7 +5,8 @@ import requests
 
 from app.agents.ds.ds01_market_research import analyze_market, MarketResearchRequest
 from app.agents.core.msp import MSP
-from app.llm.brat_gpt import simple_chat  # brat_gpt_chat BURDAN İMPORT OLMUR
+from app.llm.brat_gpt import brat_gpt_chat   # <<--- DÜZGÜN IMPORT
+
 
 app = FastAPI(title="BRAT Backend")
 
@@ -15,31 +14,6 @@ app = FastAPI(title="BRAT Backend")
 #  MSP CORE
 # =========================
 msp = MSP()
-
-
-# =========================
-#  BRAT GPT CHAT HELPER
-# =========================
-def brat_gpt_chat(user_text: str) -> str:
-    """
-    Generic Brat GPT dialog helper for Telegram.
-    simple_chat() üstündə nazik wrapper-dir.
-    """
-    system_prompt = (
-        "You are GPT Brat – strategic, honest and practical AI co-founder "
-        "for Zahid Brat and Samarkand Soul. "
-        "Speak clearly, be concrete, avoid fluff. "
-        "You may mix a tiny bit of playful tone, but focus on useful, "
-        "actionable advice."
-    )
-
-    reply = simple_chat(
-        system_prompt=system_prompt,
-        user_prompt=user_text,
-        model="gpt-4o-mini",
-        temperature=0.7,
-    )
-    return reply
 
 
 # =========================
@@ -111,7 +85,7 @@ def send_telegram_message(chat_id: int, text: str):
 
 def handle_telegram_command(chat_id: int, text: str):
     """
-    Burada əsas agent loqikasıdır.
+    Burada əsas agent loqikasıdır:
 
       - /start    -> kömək mesajı
       - msp: ...  -> MSP core (router, DS-01, DS-02 və s.)
@@ -176,11 +150,9 @@ def handle_telegram_command(chat_id: int, text: str):
                 )
                 return
 
-            # DS-01 backend funksiyasını birbaşa çağırırıq
             req = MarketResearchRequest(niche=niche, country=country)
             result = analyze_market(req)
 
-            # OpenAI kvota problemi varsa, onu da göstərsin
             if isinstance(result, dict) and "error" in result:
                 send_telegram_message(
                     chat_id,
