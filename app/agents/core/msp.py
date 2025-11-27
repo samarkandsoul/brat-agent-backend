@@ -285,22 +285,26 @@ class MSP:
         #   msp: shopify: comingsoon
         #   msp: shopify: add | Title | Price | OptionalImageURL
         #   msp: shopify: collection | Premium Tablecloths
+        #   msp: shopify: structure_basic
+        #   msp: shopify: autods | niche
         # ==========================================================
         if lowered.startswith("shopify:"):
             raw_body = text[len("shopify:"):].strip()
             lowered_body = raw_body.lower()
 
             try:
-                from app.agents.ds.ds03_shopify_agent import (
+                from app.integrations.shopify_client import (
                     test_shopify_connection,
                     create_demo_product,
-                    setup_coming_soon_page,
+                    setup_coming_soon_product,
                     ShopifyDemoProductSpec,
                     create_product_from_prompt,
                     create_collection,
+                    setup_basic_store_structure,
+                    autods_search_stub,
                 )
             except Exception as e:  # pylint: disable=broad-except
-                return f"MSP error: DS03 Shopify agent import failed: {e}"
+                return f"MSP error: Shopify integration import failed: {e}"
 
             # --- test connection ---
             if lowered_body.startswith("test"):
@@ -311,18 +315,18 @@ class MSP:
                 spec = ShopifyDemoProductSpec(
                     title="Samarkand Soul Demo Tablecloth",
                     description="""
-                        <p>This is a demo product created by the Samarkand Soul DS03 Shopify Agent.</p>
-                        <p>Premium home textile, inspired by the soul of Samarkand.</p>
-                    """,
+<p>This is a demo product created by the Samarkand Soul DS03 Shopify Agent.</p>
+<p>Premium home textile, inspired by the soul of Samarkand.</p>
+""",
                     price="39.90",
                     tags=["samarkand soul", "demo", "tablecloth"],
                     image_url=None,
                 )
                 return create_demo_product(spec)
 
-            # --- coming soon page ---
+            # --- coming soon product ---
             if lowered_body.startswith("comingsoon"):
-                return setup_coming_soon_page()
+                return setup_coming_soon_product()
 
             # --- add product via text prompt ---
             if lowered_body.startswith("add"):
@@ -340,7 +344,21 @@ class MSP:
                 after = raw_body[len("collection"):].strip()
                 if after.startswith("|"):
                     after = after[1:].strip()
-                return create_collection(after)
+                return create_collection(after or "Samarkand Soul Collection")
+
+            # --- basic store structure (pages) ---
+            if lowered_body.startswith("structure_basic"):
+                return setup_basic_store_structure()
+
+            # --- AutoDS stub (future real integration) ---
+            if lowered_body.startswith("autods"):
+                # Format:
+                #   autods | niche name
+                after = raw_body[len("autods"):].strip()
+                if after.startswith("|"):
+                    after = after[1:].strip()
+                niche = after or "general niche"
+                return autods_search_stub(niche)
 
             return (
                 "Shopify agent commands:\n"
@@ -349,6 +367,8 @@ class MSP:
                 "  • msp: shopify: comingsoon\n"
                 "  • msp: shopify: add | Title | Price | OptionalImageURL\n"
                 "  • msp: shopify: collection | Collection Name\n"
+                "  • msp: shopify: structure_basic\n"
+                "  • msp: shopify: autods | niche\n"
             )
 
         # ==========================================================
@@ -582,7 +602,7 @@ class MSP:
             "  • msp: image: Samarkand Soul Ikat Tablecloth | hero image for product page | warm beige, minimalist, family dinner\n"
             "  • msp: life01: give me a health & habit plan\n"
             "  • msp: sys01: explain the system knowledge base\n"
-            "  • msp: shopify: test / demo / comingsoon / add / collection\n"
+            "  • msp: shopify: test / demo / comingsoon / add / collection / structure_basic / autods\n"
             "  • msp: gpt: Explain the Samarkand Soul brand in 3 sentences\n"
             "  • msp: tga: start  (TikTok Growth Agent daily cycle)\n"
             )
