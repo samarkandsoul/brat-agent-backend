@@ -273,6 +273,14 @@ premium tablecloths, minimalist design, deep storytelling.</p>
         return f"MSP error: setup_coming_soon_product exception: {e}"
 
 
+# Backwards-compat: old name
+def setup_coming_soon_page() -> str:
+    """
+    Backwards-compatible wrapper for older DS code.
+    """
+    return setup_coming_soon_product()
+
+
 # ==========================================================
 #  PRODUCT FROM PROMPT  (msp: shopify: add | ...)
 # ==========================================================
@@ -284,6 +292,9 @@ def create_product_from_prompt(raw_prompt: str) -> str:
     IMPORTANT:
       • Products are created as DRAFT with tag 'NEEDS_APPROVAL'.
       • They are NOT published to Online Store automatically.
+
+    Telegram:
+      msp: shopify: add | Samarkand Soul Ikat Tablecloth | 79.90 | https://...
     """
     try:
         _ensure_config()
@@ -392,6 +403,179 @@ def create_collection(name: str) -> str:
 
     except Exception as e:  # pylint: disable-broad-except
         return f"MSP error: create_collection exception: {e}"
+
+
+# ==========================================================
+#  SAMARKAND SOUL DEMO STORE BOOTSTRAP
+# ==========================================================
+
+def _find_collection_by_title(title: str) -> Optional[dict]:
+    _ensure_config()
+    url = _shopify_url("custom_collections.json")
+    resp = requests.get(
+        url,
+        headers=_shopify_headers(),
+        params={"title": title, "limit": 50},
+        timeout=20,
+    )
+    if resp.status_code not in (200, 201):
+        return None
+
+    items = resp.json().get("custom_collections", [])
+    for coll in items:
+        if coll.get("title") == title:
+            return coll
+    return None
+
+
+def _create_or_get_collection_id(title: str) -> Optional[int]:
+    try:
+        existing = _find_collection_by_title(title)
+        if existing:
+            return existing.get("id")
+
+        payload = {"custom_collection": {"title": title, "published": True}}
+        url = _shopify_url("custom_collections.json")
+        resp = requests.post(
+            url,
+            headers=_shopify_headers(),
+            data=json.dumps(payload),
+            timeout=20,
+        )
+        if resp.status_code not in (200, 201):
+            return None
+
+        coll = resp.json().get("custom_collection", {})
+        return coll.get("id")
+
+    except Exception:
+        return None
+
+
+def _create_simple_product(title: str, price: str, body_html: str, tags=None):
+    try:
+        _ensure_config()
+        payload = {
+            "product": {
+                "title": title,
+                "body_html": body_html,
+                "status": "active",
+                "published": True,
+                "variants": [{"price": price}],
+                "tags": tags or ["samarkand soul", "demo"],
+            }
+        }
+        url = _shopify_url("products.json")
+        resp = requests.post(
+            url, headers=_shopify_headers(), data=json.dumps(payload), timeout=20
+        )
+        if resp.status_code not in (200, 201):
+            return None
+        return resp.json().get("product", {})
+    except Exception:
+        return None
+
+
+def _attach_product_to_collection(product_id: int, collection_id: int) -> bool:
+    try:
+        _ensure_config()
+        payload = {
+            "collect": {
+                "product_id": product_id,
+                "collection_id": collection_id,
+            }
+        }
+        url = _shopify_url("collects.json")
+        resp = requests.post(
+            url, headers=_shopify_headers(), data=json.dumps(payload), timeout=20
+        )
+        return resp.status_code in (200, 201)
+    except Exception:
+        return False
+
+
+def bootstrap_samarkand_demo_store() -> str:
+    """
+    Helper to quickly create a demo collection + products
+    for layout / testing purposes.
+    """
+    try:
+        _ensure_config()
+
+        collection_title = "Samarkand Soul Tablecloths"
+        collection_id = _create_or_get_collection_id(collection_title)
+
+        if not collection_id:
+            return f"MSP error: Could not create/find '{collection_title}'."
+
+        demo_specs = [
+            {
+                "title": "Samarkand Soul Demo Tablecloth",
+                "price": "39.90",
+                "body": "<p>Demo tablecloth used for store layout testing.</p>",
+            },
+            {
+                "title": "Samarkand Soul Test Product",
+                "price": "39.90",
+                "body": "<p>Internal test product.</p>",
+            },
+            {
+                "title": "Samarkand Soul™ Ikat Tablecloth — Ritual of the Table",
+                "price": "39.90",
+                "body": "<p>Signature Ikat concept.</p>",
+            },
+        ]
+
+        list_url = _shopify_url("products.json")
+        resp_list = requests.get(
+            list_url,
+            headers=_shopify_headers(),
+            params={"limit": 250},
+            timeout=20,
+        )
+
+        existing_by_title = {}
+        if resp_list.status_code in (200, 201):
+            for p in resp_list.json().get("products", []):
+                existing_by_title[p.get("title", "").strip()] = p
+
+        created_products = []
+
+        for spec in demo_specs:
+            title = spec["title"]
+
+            if title in existing_by_title:
+                product = existing_by_title[title]
+            else:
+                product = _create_simple_product(
+                    title=title,
+                    price=spec["price"],
+                    body_html=spec["body"],
+                    tags=["samarkand soul", "demo"],
+                )
+                if not product:
+                    continue
+
+            pid = product.get("id")
+            if pid:
+                _attach_product_to_collection(pid, collection_id)
+                created_products.append(f"- {title} (ID: {pid})")
+
+        result = [
+            "✅ Samarkand Soul demo store bootstrap completed.",
+            f"Main collection ID: {collection_id}",
+        ]
+
+        if created_products:
+            result.append("Products:")
+            result.extend(created_products)
+        else:
+            result.append("Warning: No products were created or attached.")
+
+        return "\n".join(result)
+
+    except Exception as e:  # pylint: disable-broad-except
+        return f"MSP error: bootstrap_samarkand_demo_store exception: {e}"
 
 
 # ==========================================================
