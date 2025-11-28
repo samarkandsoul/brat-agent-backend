@@ -1,26 +1,42 @@
 # app/integrations/web_research_client.py
 
 from __future__ import annotations
+
 import os
 import re
-import requests
 from typing import List, Tuple, Literal, Optional, Dict, Any
+
+import requests
+from bs4 import BeautifulSoup  # HTML parsing for fallback search
+
+# -----------------------------
+# Config & Types
+# -----------------------------
 
 DEFAULT_HEADERS = {
     "User-Agent": "SamarkandSoulBot/1.0 (+https://samarkandsoul.com)"
 }
 
-SearchProvider = Literal["NONE", "SERPAPI", "SERPER"]  # gələcəkdə ZENSERP, BRIGHTDATA və s. əlavə edə bilərik
+# gələcəkdə ZENSERP, BRIGHTDATA və s. əlavə edə bilərik
+SearchProvider = Literal["NONE", "SERPAPI", "SERPER", "DUCKDUCKGO_HTML"]
 
 SEARCH_PROVIDER: SearchProvider = os.getenv("SEARCH_PROVIDER", "NONE").upper()  # "NONE" default
 SERPAPI_KEY = os.getenv("SERPAPI_API_KEY")
 SERPER_KEY = os.getenv("SERPER_API_KEY")  # əgər Serper.dev istifadə etsən
 
+DEFAULT_TIMEOUT = int(os.getenv("WEB_REQUEST_TIMEOUT", "12"))
+
+
 class WebResearchError(Exception):
+    """Generic error for web research / search failures."""
     pass
 
 
-def fetch_url(url: str, timeout: int = 12) -> str:
+# -----------------------------
+# Low-level fetch helpers
+# -----------------------------
+
+def fetch_url(url: str, timeout: int = DEFAULT_TIMEOUT) -> str:
     """Fetch raw HTML/text from a URL."""
     try:
         resp = requests.get(url, headers=DEFAULT_HEADERS, timeout=timeout)
@@ -31,35 +47,76 @@ def fetch_url(url: str, timeout: int = 12) -> str:
 
 
 def clean_text(html: str) -> str:
-    """Very basic HTML -> text cleaner, agents üçün kifayət edir."""
+    """
+    Very basic HTML -> text cleaner, agents üçün kifayət edir.
+    Removes scripts/styles, strips tags, normalizes whitespace.
+    """
+    # remove scripts & styles
     text = re.sub(r"<script[\s\S]*?</script>", " ", html, flags=re.I)
     text = re.sub(r"<style[\s\S]*?</style>", " ", text, flags=re.I)
+    # remove all remaining tags
     text = re.sub(r"<[^>]+>", " ", text)
+    # normalize whitespace
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
 
+def fetch_and_clean(url: str, timeout: int = DEFAULT_TIMEOUT) -> str:
+    """
+    Convenience helper: fetch URL and return cleaned text content.
+    """
+    html = fetch_url(url, timeout=timeout)
+    return clean_text(html)
+
+
+# -----------------------------
+# Search entrypoint
+# -----------------------------
+
 def search_web(query: str, num_results: int = 5) -> List[Tuple[str, str]]:
     """
     Provider-agnostic web search.
+
     Returns list of (title, url).
+
+    Strategy:
+    - If SEARCH_PROVIDER explicitly set to SERPAPI/SERPER and key is present -> use that.
+    - Else -> fallback to DuckDuckGo HTML scraping backend (no API key, no phone).
     """
     provider = SEARCH_PROVIDER
-    if provider == "SERPAPI":
-        return _search_with_serpapi(query, num_results)
-    elif provider == "SERPER":
-        return _search_with_serper(query, num_results)
-    elif provider == "NONE":
-        raise WebResearchError(
-            "SEARCH_PROVIDER is NONE. Configure a search provider or disable search for this agent."
-        )
-    else:
-        raise WebResearchError(f"Unknown SEARCH_PROVIDER: {provider}")
 
+    # Explicit provider selections with keys
+    if provider == "SERPAPI":
+        if not SERPAPI_KEY:
+            # fallback if misconfigured
+            return _search_with_duckduckgo_html(query, num_results)
+        return _search_with_serpapi(query, num_results)
+
+    if provider == "SERPER":
+        if not SERPER_KEY:
+            # fallback if misconfigured
+            return _search_with_duckduckgo_html(query, num_results)
+        return _search_with_serper(query, num_results)
+
+    if provider == "DUCKDUCKGO_HTML":
+        return _search_with_duckduckgo_html(query, num_results)
+
+    # provider == "NONE" or unknown -> safe fallback
+    return _search_with_duckduckgo_html(query, num_results)
+
+
+# -----------------------------
+# Provider implementations
+# -----------------------------
 
 def _search_with_serpapi(query: str, num_results: int) -> List[Tuple[str, str]]:
+    """
+    Legacy SerpAPI integration.
+    Currently disabled because of regional restrictions.
+    """
     if not SERPAPI_KEY:
         raise WebResearchError("SERPAPI_API_KEY is not set.")
+
     # Burada səndə olan köhnə SerpApi kodun qalsın – amma artıq məcburi deyil
     # Sadə placeholder:
     raise WebResearchError("SerpApi currently disabled due to region restrictions.")
@@ -81,7 +138,7 @@ def _search_with_serper(query: str, num_results: int) -> List[Tuple[str, str]]:
     }
 
     try:
-        resp = requests.post(url, json=payload, headers=headers, timeout=12)
+        resp = requests.post(url, json=payload, headers=headers, timeout=DEFAULT_TIMEOUT)
         resp.raise_for_status()
         data = resp.json()
     except Exception as e:
@@ -96,5 +153,46 @@ def _search_with_serper(query: str, num_results: int) -> List[Tuple[str, str]]:
 
     if not results:
         raise WebResearchError("Serper returned no organic results.")
+
+    return results
+
+
+def _search_with_duckduckgo_html(query: str, num_results: int) -> List[Tuple[str, str]]:
+    """
+    Fallback search provider using DuckDuckGo's HTML interface.
+    No API key, no phone, just plain HTTP + HTML parsing.
+
+    Returns list of (title, url).
+    """
+    search_url = "https://duckduckgo.com/html/"
+    params = {
+        "q": query,
+        "kl": "us-en",  # location bias; can be adjusted
+    }
+
+    try:
+        resp = requests.get(search_url, params=params, headers=DEFAULT_HEADERS, timeout=DEFAULT_TIMEOUT)
+        resp.raise_for_status()
+    except Exception as e:
+        raise WebResearchError(f"DuckDuckGo request failed: {e}") from e
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+
+    results: List[Tuple[str, str]] = []
+    # DuckDuckGo HTML results usually use 'result__a' class for titles
+    for a in soup.select("a.result__a"):
+        title = a.get_text(strip=True)
+        link = a.get("href")
+        if not link or not title:
+            continue
+
+        # DuckDuckGo sometimes returns redirect URLs; keep as-is for now
+        results.append((title, link))
+
+        if len(results) >= num_results:
+            break
+
+    if not results:
+        raise WebResearchError("DuckDuckGo HTML returned no results or layout changed.")
 
     return results
