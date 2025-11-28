@@ -402,12 +402,11 @@ class MSP:
                     fetch_url,
                     format_search_results,
                 )
-            except Exception as e:  # pylint: disable=broad-except
+            except Exception as e:  # pylint: disable-broad-except
                 return f"MSP error: web_research_client import failed: {e}"
 
             # --- web: search | query ---
             if lowered_body.startswith("search"):
-                # keep original text after 'search' for query
                 after = raw_body[len("search"):].strip()
                 if after.startswith("|"):
                     after = after[1:].strip()
@@ -437,6 +436,157 @@ class MSP:
                 "Web Research commands:\n"
                 "  • msp: web: search | keyword\n"
                 "  • msp: web: fetch | https://example.com\n"
+            )
+
+        # ==========================================================
+        # 3.56) GMAIL AGENT — read & send email
+        # ==========================================================
+        if lowered.startswith("gmail:"):
+            raw_body = text[len("gmail:"):].strip()
+            lowered_body = raw_body.lower()
+
+            try:
+                from app.integrations.google_client import (
+                    list_recent_emails,
+                    send_email,
+                    GoogleClientError,
+                )
+            except Exception as e:  # pylint: disable-broad-except
+                return f"MSP error: google_client import failed: {e}"
+
+            # --- gmail: unread | 5  / gmail: recent | 10 ---
+            if lowered_body.startswith("unread") or lowered_body.startswith("recent"):
+                count = 5
+                parts = raw_body.split("|", 1)
+                if len(parts) == 2:
+                    try:
+                        count = int(parts[1].strip())
+                    except ValueError:
+                        pass
+
+                query = "is:unread" if lowered_body.startswith("unread") else ""
+                try:
+                    emails = list_recent_emails(max_results=count, query=query)
+                except GoogleClientError as e:
+                    return f"GMAIL error: {e}"
+
+                if not emails:
+                    return "📥 Gmail: uyğun məktub tapılmadı."
+
+                lines: List[str] = ["📥 *Gmail — son məktublar:*"]
+                for idx, msg in enumerate(emails, start=1):
+                    from_f = msg.get("from", "")
+                    subject = msg.get("subject", "")
+                    date = msg.get("date", "")
+                    snippet = msg.get("snippet", "")
+                    lines.append(
+                        f"{idx}. *{subject}*\n"
+                        f"   From: `{from_f}`\n"
+                        f"   Date: `{date}`\n"
+                        f"   Snippet: {snippet}"
+                    )
+                return "\n".join(lines)
+
+            # --- gmail: send | to@example.com | Subject | Body text ---
+            if lowered_body.startswith("send"):
+                after = raw_body[len("send"):].strip()
+                if after.startswith("|"):
+                    after = after[1:].strip()
+
+                parts = [p.strip() for p in after.split("|")]
+                if len(parts) < 3:
+                    return (
+                        "GMAIL send formatı:\n"
+                        "  msp: gmail: send | to@example.com | Subject | Body text"
+                    )
+
+                to_email = parts[0]
+                subject = parts[1]
+                body_text = parts[2]
+
+                try:
+                    msg_id = send_email(
+                        to_email=to_email,
+                        subject=subject,
+                        body_text=body_text,
+                    )
+                except GoogleClientError as e:
+                    return f"GMAIL send error: {e}"
+
+                return f"📧 Gmail: məktub göndərildi. ID: `{msg_id}`"
+
+            # --- help ---
+            return (
+                "Gmail agent komandaları:\n"
+                "  • msp: gmail: unread | 5\n"
+                "  • msp: gmail: recent | 10\n"
+                "  • msp: gmail: send | to@example.com | Subject | Body text\n"
+            )
+
+        # ==========================================================
+        # 3.57) CALENDAR AGENT — upcoming events
+        # ==========================================================
+        if lowered.startswith("calendar:") or lowered.startswith("cal:"):
+            if lowered.startswith("calendar:"):
+                raw_body = text[len("calendar:"):].strip()
+            else:
+                raw_body = text[len("cal:"):].strip()
+
+            lowered_body = raw_body.lower()
+
+            try:
+                from app.integrations.google_client import (
+                    list_upcoming_events,
+                    GoogleClientError,
+                )
+            except Exception as e:  # pylint: disable-broad-except
+                return f"MSP error: google_client import failed: {e}"
+
+            if lowered_body.startswith("upcoming") or lowered_body.startswith("today"):
+                count = 5
+                parts = raw_body.split("|", 1)
+                if len(parts) == 2:
+                    try:
+                        count = int(parts[1].strip())
+                    except ValueError:
+                        pass
+
+                try:
+                    events = list_upcoming_events(max_results=count)
+                except GoogleClientError as e:
+                    return f"CALENDAR error: {e}"
+
+                if not events:
+                    return "📅 Calendar: yaxın vaxtda event yoxdur."
+
+                lines: List[str] = ["📅 *Google Calendar — upcoming events:*"]
+                for ev in events:
+                    summary = ev.get("summary", "(no title)")
+                    start = (
+                        ev.get("start", {}).get("dateTime")
+                        or ev.get("start", {}).get("date")
+                        or ""
+                    )
+                    end = (
+                        ev.get("end", {}).get("dateTime")
+                        or ev.get("end", {}).get("date")
+                        or ""
+                    )
+                    location = ev.get("location", "") or "-"
+
+                    lines.append(
+                        f"- *{summary}*\n"
+                        f"   When: `{start}` → `{end}`\n"
+                        f"   Location: {location}"
+                    )
+
+                return "\n".join(lines)
+
+            # --- help ---
+            return (
+                "Calendar agent komandaları:\n"
+                "  • msp: calendar: upcoming | 5\n"
+                "  • msp: cal: today | 10\n"
             )
 
         # ==========================================================
@@ -652,6 +802,8 @@ class MSP:
             "  • msp: shopify: test / demo / comingsoon / add / collection / structure_basic / update_page / autods\n"
             "  • msp: web: search | keyword\n"
             "  • msp: web: fetch | https://example.com\n"
+            "  • msp: gmail: unread | 5\n"
+            "  • msp: calendar: upcoming | 5\n"
             "  • msp: gpt: Explain the Samarkand Soul brand in 3 sentences\n"
             "  • msp: tga: start  (TikTok Growth Agent daily cycle)\n"
             )
