@@ -1,11 +1,12 @@
-# приложение/агенты/дс/ds03_shopify_agent.py
+# app/agents/ds/ds03_shopify_agent.py
 
 """
 DS-03 — Shopify Agent
 
 High-level orchestrator for all Shopify operations.
-HTTP və Shopify Admin API ilə birbaşa işləri `интеграции/shopify_client.py`
-faylı görür, bu agent isə MSP/Agent Brain tərəfdən sadə komandalar alır.
+HTTP və Shopify Admin API ilə birbaşa işləri
+`app/integrations/shopify_client.py` faylı görür,
+bu agent isə MSP/Agent Brain tərəfdən sadə komandalar alır.
 
 Bu agentdən istifadə edən əsas komandalar (MSP üçün):
   - shopify.test
@@ -19,12 +20,10 @@ Bu agentdən istifadə edən əsas komandalar (MSP üçün):
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Optional, List
+from typing import Optional
 
-# Relative import – DS-03 yerləşdiyi qovluqdan 2 səviyyə yuxarı çıxıb
-# "интеграции/shopify_client.py" modulunu götürür.
-from ...интеграции import shopify_client
+# ✅ DÜZGÜN IMPORT – artıq `app.integrations` paketindən gəlir
+from ...integrations import shopify_client
 
 
 # ==========================================================
@@ -63,11 +62,9 @@ def cmd_setup_coming_soon() -> str:
     """
     DS-03: Create or update 'Samarkand Soul — Coming Soon' product.
     """
-    # Qeyd: integration modulunda funksiya adı `setup_coming_soon_product`
-    # kimi yazılıbsa, ona uyğun çağırılır.
+    # integration modulunda həm köhnə, həm yeni ad yoxlanır
     if hasattr(shopify_client, "setup_coming_soon_product"):
         return shopify_client.setup_coming_soon_product()
-    # Köhnə adı saxlamısansa:
     if hasattr(shopify_client, "setup_coming_soon_page"):
         return shopify_client.setup_coming_soon_page()
     return (
