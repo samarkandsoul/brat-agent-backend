@@ -153,7 +153,7 @@ def create_demo_product(spec: ShopifyDemoProductSpec) -> str:
             f"Storefront URL (if published later): {storefront_url}"
         )
 
-    except Exception as e:  # pylint: disable=broad-except
+    except Exception as e:  # pylint: disable-broad-except
         return f"MSP error: Demo product exception: {e}"
 
 
@@ -269,7 +269,7 @@ premium tablecloths, minimalist design, deep storytelling.</p>
             f"Storefront URL: {storefront_url}"
         )
 
-    except Exception as e:  # pylint: disable=broad-except
+    except Exception as e:  # pylint: disable-broad-except
         return f"MSP error: setup_coming_soon_product exception: {e}"
 
 
@@ -281,8 +281,9 @@ def create_product_from_prompt(raw_prompt: str) -> str:
     """
     Parse 'Title | Price | OptionalImageURL' and create a simple product.
 
-    Telegram:
-      msp: shopify: add | Samarkand Soul Ikat Tablecloth | 79.90 | https://...
+    IMPORTANT:
+      • Products are created as DRAFT with tag 'NEEDS_APPROVAL'.
+      • They are NOT published to Online Store automatically.
     """
     try:
         _ensure_config()
@@ -302,10 +303,11 @@ def create_product_from_prompt(raw_prompt: str) -> str:
             "product": {
                 "title": title,
                 "body_html": f"<p>{title}</p>",
-                "status": "active",
-                "published": True,
+                # Agent-created products must be manually approved by Zahid.
+                "status": "draft",
+                "published": False,
                 "variants": [{"price": price}],
-                "tags": ["samarkand soul", "ds-auto"],
+                "tags": ["samarkand soul", "ds-auto", "NEEDS_APPROVAL"],
             }
         }
 
@@ -331,15 +333,16 @@ def create_product_from_prompt(raw_prompt: str) -> str:
         storefront_url = f"/products/{handle}" if handle else "unknown"
 
         return (
-            "✅ Product created in Shopify.\n"
+            "✅ Product CREATED as DRAFT in Shopify.\n"
+            "Status: draft (NEEDS_MANUAL_APPROVAL)\n"
             f"Title: {title}\n"
             f"Price: {price}\n"
             f"ID: {pid}\n"
             f"Admin URL: {admin_url}\n"
-            f"Storefront URL: {storefront_url}"
+            f"Storefront URL (after publish): {storefront_url}"
         )
 
-    except Exception as e:  # pylint: disable=broad-except
+    except Exception as e:  # pylint: disable-broad-except
         return f"MSP error: create_product_from_prompt exception: {e}"
 
 
@@ -387,7 +390,7 @@ def create_collection(name: str) -> str:
             f"Handle: {handle}"
         )
 
-    except Exception as e:  # pylint: disable=broad-except
+    except Exception as e:  # pylint: disable-broad-except
         return f"MSP error: create_collection exception: {e}"
 
 
@@ -543,7 +546,7 @@ products, you can reach us via email or the contact form on this page.</p>
             "Pages:\n- " + "\n- ".join(changes)
         )
 
-    except Exception as e:  # pylint: disable=broad-except
+    except Exception as e:  # pylint: disable-broad-except
         return f"MSP error: setup_basic_store_structure exception: {e}"
 
 
@@ -606,5 +609,5 @@ def overwrite_page_html(handle: str, body_html: str, title: Optional[str] = None
             f"Title: {page_title}\n"
             f"Result: {result}"
         )
-    except Exception as e:  # pylint: disable=broad-except
+    except Exception as e:  # pylint: disable-broad-except
         return f"MSP error: overwrite_page_html exception: {e}"
