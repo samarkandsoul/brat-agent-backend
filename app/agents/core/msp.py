@@ -44,6 +44,7 @@ class MSP:
             "ds20": "EXPERIMENTS & A/B TESTING LAB",
             "ds21": "PRODUCT-AUTO-CREATOR",
             "ds22": "IMAGE-AUTO-AGENT",
+            "ds23": "TIKTOK-VIDEO-AUTO-AGENT",
         }
 
         # LIFE agents – commander-i qoruyan təbəqə (sağlamlıq, zaman, fokus)
@@ -269,7 +270,7 @@ class MSP:
                     autods_search_stub,
                     overwrite_page_html,
                 )
-            except Exception as e:  # pylint: disable=broad-except
+            except Exception as e:  # pylint: disable-broad-except
                 return f"MSP error: Shopify integration import failed: {e}"
 
             # --- test connection ---
@@ -361,7 +362,7 @@ class MSP:
                         user_prompt=gpt_prompt,
                         agent_role="Samarkand Soul Shopify Page Writer",
                     )
-                except Exception as e:  # pylint: disable=broad-except
+                except Exception as e:  # pylint: disable-broad-except
                     return f"MSP error: GPT bridge failed inside update_page: {e}"
 
                 return overwrite_page_html(handle, html)
@@ -435,7 +436,7 @@ class MSP:
 
             try:
                 return creator.create_full_product(idea)
-            except Exception as e:  # pylint: disable=broad-except
+            except Exception as e:  # pylint: disable-broad-except
                 return f"MSP error: DS-21 processing error: {e}"
 
         # ==========================================================
@@ -472,7 +473,7 @@ class MSP:
                     ImageAutoAgent,
                     ImageIdea,
                 )
-            except Exception as e:  # pylint: disable=broad-except
+            except Exception as e:  # pylint: disable-broad-except
                 return f"MSP error: DS-22 module import failed: {e}"
 
             agent = ImageAutoAgent()
@@ -485,7 +486,7 @@ class MSP:
 
             try:
                 return agent.generate_image_plan(idea)
-            except Exception as e:  # pylint: disable=broad-except
+            except Exception as e:  # pylint: disable-broad-except
                 return f"MSP error: DS-22 processing error: {e}"
 
         # ==========================================================
@@ -504,12 +505,12 @@ class MSP:
                 from app.agents.ds.ds05_product_page_copywriter import (
                     generate_product_page_copy_from_text,
                 )
-            except Exception as e:  # pylint: disable=broad-except
+            except Exception as e:  # pylint: disable-broad-except
                 return f"MSP error: could not import DS-05 module: {e}"
 
             try:
                 return generate_product_page_copy_from_text(body)
-            except Exception as e:  # pylint: disable=broad-except
+            except Exception as e:  # pylint: disable-broad-except
                 return f"MSP error: DS-05 processing error: {e}"
 
         # ==========================================================
@@ -533,7 +534,7 @@ class MSP:
                     agent_role="Samarkand Soul General Agent",
                 )
                 return f"MSP / GPT reply:\n{reply}"
-            except Exception as e:  # pylint: disable=broad-except
+            except Exception as e:  # pylint: disable-broad-except
                 return f"MSP error: GPT bridge failed: {e}"
 
         # ==========================================================
