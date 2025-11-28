@@ -1,5 +1,3 @@
-# app/integrations/web_research_client.py
-
 from __future__ import annotations
 
 import os
@@ -196,3 +194,43 @@ def _search_with_duckduckgo_html(query: str, num_results: int) -> List[Tuple[str
         raise WebResearchError("DuckDuckGo HTML returned no results or layout changed.")
 
     return results
+
+
+# -----------------------------
+# High-level helpers for MSP / agents
+# -----------------------------
+
+def format_search_results(query: str, num_results: int = 5) -> str:
+    """
+    MSP üçün rahat format.
+
+    Input:
+        query – axtarış sözü
+        num_results – neçə nəticə qaytarsın
+
+    Output:
+        Telegram/Markdown üçün səliqəli mətn.
+    """
+    try:
+        results = search_web(query, num_results=num_results)
+    except WebResearchError as e:
+        return f"WEB search error: {e}"
+
+    if not results:
+        return f"WEB search: `{query}` üçün nəticə tapılmadı."
+
+    lines: List[str] = [
+        f"🔎 *Web Search results for:* `{query}`",
+        "",
+    ]
+
+    for idx, (title, url) in enumerate(results, start=1):
+        # Sadə və sabit Markdown formatı
+        lines.append(f"{idx}. *{title}*\n   {url}")
+
+    lines.append(
+        "\nDaha dərin analiz üçün konkret linki belə açdır:\n"
+        "`msp: web: fetch | https://example.com`"
+    )
+
+    return "\n".join(lines)
