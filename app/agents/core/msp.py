@@ -17,11 +17,12 @@ class MSP:
     """
     MSP (Main Service Processor) – central router for the Samarkand Soul bot.
 
-    Bütün `msp: ...` tipli komandalar buradan keçir və uyğun agenta / inteqrasiyaya yönləndirilir.
+    All `msp: ...` style commands from Telegram pass through here and are
+    routed to the correct agent / integration.
     """
 
     def __init__(self) -> None:
-        # DS (Dropshipping System) agent labels (demo handlerlər üçün)
+        # DS (Dropshipping System) agent labels (for demo handlers)
         self.ds_labels = {
             "ds02": "DRIVE-AGENT",
             "ds03": "SHOPIFY-AGENT",
@@ -47,7 +48,7 @@ class MSP:
             "ds23": "TIKTOK-VIDEO-AUTO-AGENT",
         }
 
-        # LIFE agents – commander-i qoruyan təbəqə (sağlamlıq, zaman, fokus)
+        # LIFE agents – protect commander (health, time, focus)
         self.life_labels = {
             "life01": "HEALTH & HABIT-COACH",
             "life02": "NUTRITION & MEAL PLANNER",
@@ -56,7 +57,7 @@ class MSP:
             "life05": "INFO & NEWS CURATOR",
         }
 
-        # SYS agents – sistemi təmiz və təkamüldə saxlayan təbəqə
+        # SYS agents – keep the system clean and evolving
         self.sys_labels = {
             "sys01": "KNOWLEDGE-LIBRARIAN",
             "sys02": "SECURITY & PRIVACY-GUARDIAN",
@@ -65,10 +66,10 @@ class MSP:
             "sys05": "FUTURE-ROADMAP & INNOVATION-PLANNER",
         }
 
-        # DS-02 Drive Agent – Google Drive qovluq blueprintləri
+        # DS-02 Drive Agent – Google Drive folder blueprints
         self.drive = DriveAgent()
 
-        # TikTok Growth Agent (TGA) – kontent fabriki
+        # TikTok Growth Agent (TGA) – content factory
         self.tga = TikTokGrowthAgent()
 
     # =========================
@@ -76,7 +77,7 @@ class MSP:
     # =========================
     def load_mamos(self) -> str:
         """
-        Samarkand Soul-un qlobal doktrinasını (MAMOS) yükləyir.
+        Load the global Samarkand Soul doctrine (MAMOS).
         """
         return MAMOSLoader.load_mamos()
 
@@ -86,7 +87,7 @@ class MSP:
     @staticmethod
     def _strip_msp_prefix(raw_text: str) -> str:
         """
-        'msp:' prefiksini təmizlə və whitespace-ləri kəs.
+        Remove 'msp:' prefix and trim whitespace.
         """
         text = (raw_text or "").strip()
         if text.lower().startswith("msp:"):
@@ -96,7 +97,7 @@ class MSP:
     @staticmethod
     def _split_once(body: str, sep: str = "|") -> Tuple[str, str]:
         """
-        "a | b" formatını iki hissəyə bölmək üçün helper.
+        Simple helper to split "a | b" into two pieces.
         """
         parts = [p.strip() for p in body.split(sep, 1)]
         if len(parts) == 1:
@@ -108,13 +109,13 @@ class MSP:
     # =========================
     def build_tga_preview_payloads(self) -> List[Dict[str, Any]]:
         """
-        Telegram üçün TGA preview payload-larını qaytarır.
+        Build Telegram preview payloads for TGA drafts.
         """
         return self.tga.build_telegram_preview_payloads()
 
     def process_callback(self, callback_data: str) -> Optional[str]:
         """
-        Telegram callback_data router-i (hal-hazırda yalnız TGA üçün).
+        Telegram callback_data router (currently only for TGA).
         """
         if not callback_data:
             return None
@@ -136,7 +137,7 @@ class MSP:
     # =========================
     def process(self, raw_text: str) -> str:
         """
-        Telegram-dan gələn BÜTÜN mətni idarə edən əsas giriş nöqtəsi.
+        Main entrypoint for ALL text coming from Telegram.
         """
         if not raw_text:
             return "MSP error: empty message."
@@ -192,7 +193,7 @@ class MSP:
             try:
                 req = MarketResearchRequest(niche=niche, country=country)
                 result = analyze_market(req)
-            except Exception as e:  # pylint: disable=broad-except
+            except Exception as e:  # pylint: disable-broad-except
                 return f"MSP error: DS-01 processing error: {e}"
 
             return f"DS-01 Market Research result:\n{result}"
@@ -228,7 +229,7 @@ class MSP:
         # 3) DS-02 DRIVE AGENT (real logical layer)
         # ==========================================================
         if lowered.startswith("drive"):
-            # Nümunə:
+            # Examples:
             #   msp: drive: SamarkandSoulSystem / DS System / DS-01 - Market-Research-Master
             #   msp: drive SamarkandSoulSystem / DS-02 - Drive-Agent-Lab
             body = text
@@ -248,7 +249,7 @@ class MSP:
 
             try:
                 return self.drive.create_folder_path(path)
-            except Exception as e:  # pylint: disable=broad-except
+            except Exception as e:  # pylint: disable-broad-except
                 return f"MSP error: DS-02 DriveAgent failure: {e}"
 
         # ==========================================================
@@ -316,7 +317,7 @@ class MSP:
             if lowered_body.startswith("structure_basic"):
                 return setup_basic_store_structure()
 
-            # --- update single page via GPT (legal / about / shipping və s.) ---
+            # --- update single page via GPT (legal / about / shipping etc.) ---
             if lowered_body.startswith("update_page"):
                 # Format:
                 #   msp: shopify: update_page | privacy-policy | Brief text...
@@ -347,7 +348,7 @@ class MSP:
                 handle = parts[0].lower()
                 brief = parts[1]
 
-                # HTML-i GPT ilə generasiya edirik
+                # HTML is generated via GPT, then pushed to Shopify
                 try:
                     gpt_prompt = (
                         "You are the official content & legal page writer for the Samarkand Soul Shopify store.\n"
@@ -367,7 +368,7 @@ class MSP:
 
                 return overwrite_page_html(handle, html)
 
-            # --- AutoDS stub (gələcək real inteqrasiya üçün) ---
+            # --- AutoDS stub (future real integration) ---
             if lowered_body.startswith("autods"):
                 #   msp: shopify: autods | tablecloth niche
                 after = raw_body[len("autods"):].strip()
@@ -387,6 +388,55 @@ class MSP:
                 "  • msp: shopify: structure_basic\n"
                 "  • msp: shopify: update_page | handle | brief\n"
                 "  • msp: shopify: autods | niche\n"
+            )
+
+        # ==========================================================
+        # 3.55) WEB RESEARCH AGENT — Internet access
+        # ==========================================================
+        if lowered.startswith("web:"):
+            raw_body = text[len("web:"):].strip()
+            lowered_body = raw_body.lower()
+
+            try:
+                from app.integrations.web_research_client import (
+                    fetch_url,
+                    format_search_results,
+                )
+            except Exception as e:  # pylint: disable=broad-except
+                return f"MSP error: web_research_client import failed: {e}"
+
+            # --- web: search | query ---
+            if lowered_body.startswith("search"):
+                # keep original text after 'search' for query
+                after = raw_body[len("search"):].strip()
+                if after.startswith("|"):
+                    after = after[1:].strip()
+                query = after or ""
+                if not query:
+                    return (
+                        "WEB error: Missing query.\n"
+                        "Format: msp: web: search | keyword"
+                    )
+                return format_search_results(query)
+
+            # --- web: fetch | URL ---
+            if lowered_body.startswith("fetch"):
+                after = raw_body[len("fetch"):].strip()
+                if after.startswith("|"):
+                    after = after[1:].strip()
+                url = after or ""
+                if not url:
+                    return (
+                        "WEB error: Missing URL.\n"
+                        "Format: msp: web: fetch | https://example.com"
+                    )
+                return fetch_url(url)
+
+            # Default help for web agent
+            return (
+                "Web Research commands:\n"
+                "  • msp: web: search | keyword\n"
+                "  • msp: web: fetch | https://example.com\n"
             )
 
         # ==========================================================
@@ -423,7 +473,7 @@ class MSP:
                     ProductAutoCreator,
                     ProductIdea,
                 )
-            except Exception as e:  # pylint: disable=broad-except
+            except Exception as e:  # pylint: disable-broad-except
                 return f"MSP error: DS-21 module import failed: {e}"
 
             creator = ProductAutoCreator()
@@ -600,6 +650,8 @@ class MSP:
             "  • msp: life01: give me a health & habit plan\n"
             "  • msp: sys01: explain the system knowledge base\n"
             "  • msp: shopify: test / demo / comingsoon / add / collection / structure_basic / update_page / autods\n"
+            "  • msp: web: search | keyword\n"
+            "  • msp: web: fetch | https://example.com\n"
             "  • msp: gpt: Explain the Samarkand Soul brand in 3 sentences\n"
             "  • msp: tga: start  (TikTok Growth Agent daily cycle)\n"
             )
