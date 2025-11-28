@@ -1,22 +1,20 @@
-# app/integrations/web_research_client.py
-
 """
-Web Research Client
+Web Research Client (SERPAPI EDITION)
 
-This module gives the agent system a basic "internet brain":
-- fetch plain text from a given URL
-- run a simple DuckDuckGo search and return top results
+This module gives the agent system a reliable internet search brain
+using SerpAPI (Google Search API).
 
-Later, DS-01 / DS-21 / other agents can import this module
-and reuse its functions.
+Functions:
+- fetch_url(url): returns cleaned text from a webpage
+- search_web(query): uses SerpAPI Google Search (stable, non-blocked)
 """
 
 from __future__ import annotations
 
+import os
 import re
-from typing import List, Tuple
-
 import requests
+from typing import List, Tuple
 
 # Common User-Agent for all outgoing HTTP requests
 DEFAULT_HEADERS = {
@@ -24,22 +22,20 @@ DEFAULT_HEADERS = {
     "Accept-Language": "en-US,en;q=0.9",
 }
 
+# SERPAPI KEY (you must set it in Render environment)
+SERPAPI_KEY = os.getenv("SERPAPI_KEY", "")
 
-def fetch_url(url: str, timeout: int = 12, max_chars: int = 8000) -> str:
-    """
-    Fetch a URL and return cleaned plain text.
-
-    - Strips HTML tags, scripts, styles
-    - Collapses whitespace
-    - Truncates long pages to `max_chars`
-    """
+# -------------------------------
+# FETCH URL (works correctly)
+# -------------------------------
+def fetch_url(url: str, timeout: int = 12, max_chars: int = 9000) -> str:
     url = (url or "").strip()
     if not url:
         return "WEB-ERROR: URL is empty."
 
     try:
         resp = requests.get(url, headers=DEFAULT_HEADERS, timeout=timeout)
-    except Exception as e:  # pylint: disable=broad-except
+    except Exception as e:
         return f"WEB-ERROR: request failed: {e}"
 
     if resp.status_code != 200:
@@ -47,24 +43,10 @@ def fetch_url(url: str, timeout: int = 12, max_chars: int = 8000) -> str:
 
     text = resp.text
 
-    # Remove scripts and styles
-    clean = re.sub(
-        r"<script.*?</script>",
-        " ",
-        text,
-        flags=re.DOTALL | re.IGNORECASE,
-    )
-    clean = re.sub(
-        r"<style.*?</style>",
-        " ",
-        clean,
-        flags=re.DOTALL | re.IGNORECASE,
-    )
-
-    # Remove all HTML tags
+    # Remove scripts, styles, and HTML tags
+    clean = re.sub(r"<script.*?</script>", " ", text, flags=re.DOTALL | re.IGNORECASE)
+    clean = re.sub(r"<style.*?</style>", " ", clean, flags=re.DOTALL | re.IGNORECASE)
     clean = re.sub(r"<[^>]+>", " ", clean)
-
-    # Normalize whitespace
     clean = re.sub(r"\s+", " ", clean).strip()
 
     if len(clean) > max_chars:
@@ -73,75 +55,53 @@ def fetch_url(url: str, timeout: int = 12, max_chars: int = 8000) -> str:
     return clean
 
 
-def duckduckgo_search(
-    query: str,
-    max_results: int = 5,
-    timeout: int = 12,
-) -> List[Tuple[str, str]]:
+# -------------------------------
+# GOOGLE SEARCH (SERPAPI)
+# -------------------------------
+def search_web(query: str, max_results: int = 5) -> List[Tuple[str, str]]:
     """
-    Run a simple DuckDuckGo HTML search.
+    Uses SerpAPI for guaranteed search results.
+    Returns list of (title, url).
+    """
+    if not query:
+        return []
 
-    Returns a list of (title, url) tuples.
-    If anything fails, returns an empty list.
-    """
-    q = (query or "").strip()
-    if not q:
+    if not SERPAPI_KEY:
         return []
 
     try:
-        resp = requests.get(
-            "https://duckduckgo.com/html/",
-            params={"q": q},
-            headers=DEFAULT_HEADERS,
-            timeout=timeout,
-        )
+        url = "https://serpapi.com/search"
+        params = {
+            "engine": "google",
+            "q": query,
+            "api_key": SERPAPI_KEY,
+        }
+        resp = requests.get(url, params=params, timeout=10)
+        data = resp.json()
     except Exception:
         return []
 
-    if resp.status_code != 200:
-        return []
-
-    html = resp.text
-
-    # Very simple parser: find <a> elements with class "result__a"
-    pattern = re.compile(
-        r'<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
-        re.IGNORECASE | re.DOTALL,
-    )
-
-    results: List[Tuple[str, str]] = []
-    for match in pattern.finditer(html):
-        url = match.group(1)
-        title_html = match.group(2)
-        # Strip any HTML tags from the title
-        title = re.sub(r"<[^>]+>", " ", title_html)
-        title = re.sub(r"\s+", " ", title).strip()
-        if url and title:
-            results.append((title, url))
-        if len(results) >= max_results:
-            break
+    results = []
+    organic = data.get("organic_results", [])
+    for item in organic[:max_results]:
+        title = item.get("title", "")
+        link = item.get("link", "")
+        if title and link:
+            results.append((title, link))
 
     return results
 
 
+# -------------------------------
+# FORMATTED RESULT STRING
+# -------------------------------
 def format_search_results(query: str, max_results: int = 5) -> str:
-    """
-    Helper for MSP / Telegram: returns search results as plain text.
-    """
-    query = (query or "").strip()
-    if not query:
-        return "WEB-ERROR: search query is empty."
-
-    items = duckduckgo_search(query, max_results=max_results)
+    items = search_web(query, max_results=max_results)
     if not items:
-        return f"No search results or network error for query: {query!r}"
+        return f"No results or SERPAPI key missing.\nQuery: {query!r}"
 
-    lines = [
-        f"Web search results for: {query!r}",
-        "",
-    ]
-
-    for idx, (title, url) in enumerate(items, start=1):
-        lines.append(f"{idx}. {title}\n   {url}")
+    lines = [f"🔍 Search results for: {query}\n"]
+    for i, (title, link) in enumerate(items, start=1):
+        lines.append(f"{i}) {title}\n{link}\n")
 
     return "\n".join(lines)
