@@ -56,43 +56,57 @@ def market_analyze(req: MarketResearchRequest):
 
 
 # =========================
-#  DAILY COMMAND REPORT ENDPOINTLƏRİ
+#  DAILY REPORT ENDPOINTLƏRİ
 # =========================
+
 @app.get("/daily-report/preview")
 def daily_report_preview():
     """
     DailyReport obyektini xam JSON kimi qaytarır.
-    Monitor UI və ya debug üçün.
     """
-    report = build_daily_report()
-    return report
+    try:
+        report = build_daily_report()
+        # FastAPI dataclass-ları özü serialize edə bilir.
+        return {"status": "ok", "report": report}
+    except Exception as e:  # noqa: BLE001
+        # Debug üçün sadə error mesajı
+        return {"status": "error", "error": str(e)}
 
 
 @app.get("/daily-report/text")
 def daily_report_text():
     """
-    Telegram-a göndəriləcək formatlanmış mətnin preview versiyası.
-    Brauzerdə açıb necə göründüyünü test edə bilərsən.
+    Telegram-a göndərilən formatlanmış mətnin preview versiyası.
     """
-    text = generate_daily_report_text()
-    return {"text": text}
+    try:
+        text = generate_daily_report_text()
+        return {"status": "ok", "text": text}
+    except Exception as e:  # noqa: BLE001
+        return {"status": "error", "error": str(e)}
 
 
+from fastapi import APIRouter
+
+# GET + POST birlikdə işləsin deyə api_route istifadə edirik
 @app.api_route("/daily-report/send", methods=["GET", "POST"])
 def daily_report_send():
     """
     Daily report-u Telegram-a göndərir.
-
-    - GET  -> brauzerdən test üçün.
-    - POST -> Render cron job bu endpoint-i çağırır.
+    - Render cron job POST ilə çağırır.
+    - Sən brauzerdən GET ilə test edə bilərsən.
     """
-    ok = send_daily_report_via_telegram()
-    return {"status": "ok" if ok else "failed"}
+    try:
+        ok = send_daily_report_via_telegram()
+        return {"status": "ok" if ok else "failed"}
+    except Exception as e:  # noqa: BLE001
+        return {"status": "error", "error": str(e)}
 
 
 # =========================
 #  TELEGRAM MASTER AGENT
 # =========================
+
+
 def handle_telegram_command(chat_id: int, text: str):
     """
     Burada əsas agent loqikasıdır:
