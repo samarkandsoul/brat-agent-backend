@@ -1,4 +1,4 @@
-# app/mamos/mamos_loader.py
+# app/mamos/MAMOS/mamos_loader.py
 
 import os
 from typing import Dict, List
@@ -10,13 +10,27 @@ class MAMOSLoader:
 
     Unified entry point for all agents to read the MAMOS doctrine.
 
+    File layout this class expects:
+
+        app/
+          mamos/
+            MAMOS/
+              MAMOS_README.md
+              mamos_loader.py
+              PART_A_IDENTITY/...
+              PART_D_OPERATIONS/...
+              ...
+
     - MAMOS_README.md  → main constitution
-    - all .md files under MAMOS/ → sub-doctrines (agents, system, operations, etc.)
+    - all .md files in this MAMOS folder (and subfolders) → sub-doctrines
     """
 
     # Base filesystem configuration
+    # __file__ = app/mamos/MAMOS/mamos_loader.py
     _BASE_PATH = os.path.dirname(os.path.abspath(__file__))
-    _MAMOS_DIR = os.path.join(_BASE_PATH, "MAMOS")
+
+    # All MAMOS .md files live in THIS folder and its subfolders
+    _MAMOS_DIR = _BASE_PATH
     _MAMOS_README = os.path.join(_MAMOS_DIR, "MAMOS_README.md")
 
     # -------------------------------------------------------------------------
