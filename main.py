@@ -1,3 +1,5 @@
+# app/main.py  (əgər adı başqa idisə – FastAPI start faylın hansıdırsa, onu əvəz et)
+
 from fastapi import FastAPI
 from pydantic import BaseModel
 
@@ -9,6 +11,11 @@ from app.reports.daily_report_service import (
     build_daily_report,
     generate_daily_report_text,
     send_daily_report_via_telegram,
+)
+from app.reports.morning_plan_service import (
+    build_morning_plan,
+    generate_morning_plan_text,
+    send_morning_plan_via_telegram,
 )
 from app.integrations.telegram_client import send_telegram_message
 
@@ -66,10 +73,8 @@ def daily_report_preview():
     """
     try:
         report = build_daily_report()
-        # FastAPI dataclass-ları özü serialize edə bilir.
         return {"status": "ok", "report": report}
     except Exception as e:  # noqa: BLE001
-        # Debug üçün sadə error mesajı
         return {"status": "error", "error": str(e)}
 
 
@@ -85,7 +90,9 @@ def daily_report_text():
         return {"status": "error", "error": str(e)}
 
 
-# GET + POST birlikdə işləsin deyə api_route istifadə edirik
+from fastapi import APIRouter  # lazımsız olsa da qalmağı problem deyil
+
+
 @app.api_route("/daily-report/send", methods=["GET", "POST"])
 def daily_report_send():
     """
@@ -97,16 +104,59 @@ def daily_report_send():
         ok = send_daily_report_via_telegram()
         if ok:
             return {"status": "ok"}
-        else:
-            # Burada artıq niyə failed olduğunu bir az izah edirik
-            return {
-                "status": "failed",
-                "error": (
-                    "send_daily_report_via_telegram() returned False. "
-                    "DEFAULT_CHAT_ID env dəyişənini və Telegram bot "
-                    "konfiqurasiyasını yoxla."
-                ),
-            }
+        return {
+            "status": "failed",
+            "error": "send_daily_report_via_telegram() returned False. "
+                     "DEFAULT_CHAT_ID env dəyərini və Telegram bot konfiqurasiyasını yoxla.",
+        }
+    except Exception as e:  # noqa: BLE001
+        return {"status": "error", "error": str(e)}
+
+
+# =========================
+#  MORNING PLAN ENDPOINTLƏRİ
+# =========================
+
+@app.get("/morning-plan/preview")
+def morning_plan_preview():
+    """
+    Morning plan-ın structured JSON preview-i.
+    """
+    try:
+        plan = build_morning_plan()
+        return {"status": "ok", "plan": plan}
+    except Exception as e:  # noqa: BLE001
+        return {"status": "error", "error": str(e)}
+
+
+@app.get("/morning-plan/text")
+def morning_plan_text():
+    """
+    Morning plan-ın Telegram mətni (preview).
+    """
+    try:
+        text = generate_morning_plan_text()
+        return {"status": "ok", "text": text}
+    except Exception as e:  # noqa: BLE001
+        return {"status": "error", "error": str(e)}
+
+
+@app.api_route("/morning-plan/send", methods=["GET", "POST"])
+def morning_plan_send():
+    """
+    Morning plan-ı Telegram-a göndərir.
+    - Cron job POST ilə çağıracaq.
+    - Brauzerdən GET ilə test etmək də olar.
+    """
+    try:
+        ok = send_morning_plan_via_telegram()
+        if ok:
+            return {"status": "ok"}
+        return {
+            "status": "failed",
+            "error": "send_morning_plan_via_telegram() returned False. "
+                     "DEFAULT_CHAT_ID env dəyərini və Telegram bot konfiqurasiyasını yoxla.",
+        }
     except Exception as e:  # noqa: BLE001
         return {"status": "error", "error": str(e)}
 
@@ -118,12 +168,7 @@ def daily_report_send():
 
 def handle_telegram_command(chat_id: int, text: str):
     """
-    Burada əsas agent loqikasıdır:
-
-      - /start    -> kömək mesajı
-      - msp: ...  -> MSP core (router, DS-01, DS-02 və s.)
-      - market:   -> DS-01 market research (birbaşa)
-      - digərləri -> Brat GPT dialoq rejimi (GPT Brat ekizi)
+    Telegram komanda router-i.
     """
     lower = text.strip().lower()
 
