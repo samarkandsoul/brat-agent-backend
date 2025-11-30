@@ -62,15 +62,11 @@ class SystemHealthMetrics:
 
 
 # =========================
-#  REPORT İTEMLƏRİ
+#  REPORT İTEM MODELİ
 # =========================
 
 @dataclass
 class DailyReportItem:
-    """
-    Sonda Telegram / Monitor üçün sadə list formatı.
-    Məs: title='Total Revenue', value='$123.45'
-    """
     title: str
     value: str | int | float | None
 
@@ -81,26 +77,26 @@ class DailyReportItem:
 
 @dataclass
 class DailyReport:
-    # Yeni sistemdə istifadə olunan sahə – error da buradan gəlirdi
-    generated_at_utc: str
+    # Optional etdik ki, build_daily_report error verməsin
+    generated_at_utc: Optional[str] = None
 
-    # Köhnə struktur üçün əlavə tarix sahəsi (istəsən istifadə edərik)
+    # Köhnə struktur üçün tarix
     date_iso: str = ""
 
-    # Yuxarı səviyyə xülasə və statistiklər
+    # Xülasə və üst səviyyə statistiklər
     summary: str = ""
     stats: Dict[str, Any] = field(default_factory=dict)
 
-    # Sadə item list (Telegram, UI üçün)
+    # Yüngül Telegram / UI item-ləri
     items: List[DailyReportItem] = field(default_factory=list)
 
-    # Dərin analitika blokları – sənin əvvəlki dizaynından:
+    # Əsas Samarkand Soul blokları
     sales: Optional[SalesMetrics] = None
     ads_channels: List[AdsChannelMetrics] = field(default_factory=list)
     content: Optional[ContentProductionMetrics] = None
     life: Optional[LifeMetrics] = None
     system_health: Optional[SystemHealthMetrics] = None
 
-    # Headline və xəbərdarlıqlar
+    # Başlıq və xəbərdarlıqlar
     headline: Optional[str] = None
     key_warnings: List[str] = field(default_factory=list)
