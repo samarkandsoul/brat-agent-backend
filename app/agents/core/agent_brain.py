@@ -12,7 +12,7 @@ Goal:
 from typing import Optional
 
 from app.llm.brat_gpt import brat_gpt_chat
-from app.mamos.mamos_loader import MAMOSLoader
+from app.mamos.MAMOS.mamos_loader import MAMOSLoader
 
 
 def get_mamos_preview(max_chars: int = 3000) -> str:
