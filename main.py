@@ -1,5 +1,7 @@
 # app/main.py
 
+from typing import Any, Dict
+
 from fastapi import FastAPI
 
 from app.agents.ds.ds01_market_research import (
@@ -19,6 +21,7 @@ from app.reports.morning_plan_service import (
 from app.integrations.telegram_client import handle_telegram_update
 
 app = FastAPI(title="BRAT Backend")
+
 
 # =========================
 #  ROOT CHECK
@@ -157,7 +160,7 @@ def morning_plan_send():
 #  TELEGRAM WEBHOOK (BRAT DIALOQ BEYNİ)
 # =========================
 @app.post("/tg/webhook")
-def telegram_webhook(update: dict):
+def telegram_webhook(update: Dict[str, Any]):
     """
     Telegram webhook endpoint.
 
