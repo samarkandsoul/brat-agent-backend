@@ -1,3 +1,5 @@
+from dataclasses import asdict
+
 from fastapi import FastAPI
 from pydantic import BaseModel
 
@@ -66,10 +68,9 @@ def daily_report_preview():
     """
     try:
         report = build_daily_report()
-        # FastAPI dataclass-ları özü serialize edə bilir.
-        return {"status": "ok", "report": report}
+        # dataclass -> dict
+        return {"status": "ok", "report": asdict(report)}
     except Exception as e:  # noqa: BLE001
-        # Debug üçün sadə error mesajı
         return {"status": "error", "error": str(e)}
 
 
@@ -84,8 +85,6 @@ def daily_report_text():
     except Exception as e:  # noqa: BLE001
         return {"status": "error", "error": str(e)}
 
-
-from fastapi import APIRouter
 
 # GET + POST birlikdə işləsin deyə api_route istifadə edirik
 @app.api_route("/daily-report/send", methods=["GET", "POST"])
