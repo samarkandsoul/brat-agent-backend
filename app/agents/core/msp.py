@@ -12,6 +12,12 @@ from app.mamos.mamos_loader import MAMOSLoader
 # Brat GPT – unified LLM interface (MAMOS-aware)
 from app.llm.brat_gpt import brat_gpt_chat
 
+# Daily Report – sales + life + system health
+from app.reports.daily_report_service import (
+    generate_daily_report_text,
+    send_daily_report_via_telegram,
+)
+
 
 class MSP:
     """
@@ -155,6 +161,45 @@ class MSP:
             doc = self.load_mamos()
             preview = doc[:3500]
             return "📜 MAMOS — Samarkand Soul Doctrine (preview):\n\n" + preview
+
+        # ==========================================================
+        # 0.5) DAILY REPORT AGENT (sales + life + system)
+        # ==========================================================
+        if lowered.startswith("daily"):
+            # Accept both:
+            #   msp: daily: report
+            #   msp: daily report
+            after = text[len("daily"):].strip()
+            if after.startswith(":"):
+                after = after[1:].strip()
+            sub = after.lower()
+
+            # default: "report" -> return formatted text
+            if sub in ("", "report", "text"):
+                try:
+                    rep_text = generate_daily_report_text()
+                    return rep_text
+                except Exception as e:  # noqa: BLE001
+                    return f"MSP error: daily report generation failed: {e}"
+
+            # "send" -> push to Telegram via backend service
+            if sub == "send":
+                try:
+                    ok = send_daily_report_via_telegram()
+                    if ok:
+                        return "✅ Daily report sent to Telegram (DEFAULT_CHAT_ID)."
+                    return (
+                        "❌ Daily report FAILED to send.\n"
+                        "Check DEFAULT_CHAT_ID env var and Telegram bot config."
+                    )
+                except Exception as e:  # noqa: BLE001
+                    return f"MSP error: daily report send failed: {e}"
+
+            return (
+                "Daily agent commands:\n"
+                "  • msp: daily: report   → show formatted daily report here\n"
+                "  • msp: daily: send     → send daily report to Telegram chat"
+            )
 
         # ==========================================================
         # 1) DS-01 MARKET RESEARCH (real module)
@@ -320,7 +365,7 @@ class MSP:
             # --- update single page via GPT (legal / about / shipping etc.) ---
             if lowered_body.startswith("update_page"):
                 # Format:
-                #   msp: shopify: update_page | privacy-policy | Brief text...
+                #   msp: shopify: update_page | privacy-policy | <Brief text>
                 after = raw_body[len("update_page"):].strip()
                 if after.startswith("|"):
                     after = after[1:].strip()
@@ -332,9 +377,7 @@ class MSP:
                         "  msp: shopify: update_page | privacy-policy | Brief for GPT\n"
                         "Example:\n"
                         "  msp: shopify: update_page | privacy-policy | "
-                        "Premium Privacy Policy text for Samarkand Soul (handmade home textiles brand). "
-                        "Generate a full legal privacy policy compliant with Shopify, covering customer data, "
-                        "cookies, payments, returns, GDPR, CCPA, and international commerce."
+                        "Premium Privacy Policy text for Samarkand Soul (handmade home textiles brand)."
                     )
 
                 parts = [p.strip() for p in after.split("|", 1)]
@@ -750,7 +793,7 @@ class MSP:
                 label = self.ds_labels[key]
                 return (
                     f"{key.upper()} — {label} (DEMO):\n"
-                    f"Input: {query}\n\n"
+                    f"Input: {query}\n"
                     "This agent is currently running in structure-test mode. "
                     "Later it will use real LLM + integrations. 🧠"
                 )
@@ -760,7 +803,7 @@ class MSP:
                 label = self.life_labels[key]
                 return (
                     f"{key.upper()} — {label} (DEMO):\n"
-                    f"Input: {query}\n\n"
+                    f"Input: {query}\n"
                     "This LIFE agent is in demo mode. In the future it will generate "
                     "personal plans and recommendations."
                 )
@@ -770,7 +813,7 @@ class MSP:
                 label = self.sys_labels[key]
                 return (
                     f"{key.upper()} — {label} (DEMO):\n"
-                    f"Input: {query}\n\n"
+                    f"Input: {query}\n"
                     "This SYS agent is in structure-test mode. System knowledge and "
                     "governance plans will live here."
                 )
@@ -806,4 +849,4 @@ class MSP:
             "  • msp: calendar: upcoming | 5\n"
             "  • msp: gpt: Explain the Samarkand Soul brand in 3 sentences\n"
             "  • msp: tga: start  (TikTok Growth Agent daily cycle)\n"
-            )
+        )
