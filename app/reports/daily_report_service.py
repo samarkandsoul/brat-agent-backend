@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import List, Tuple
 
@@ -29,12 +28,33 @@ DEFAULT_CHAT_ID: int = int(os.getenv("DEFAULT_CHAT_ID", "0") or 0)
 #  BLOK QURAN FUNKSİYALAR
 # ==========================================================
 
+def _fallback_sales_metrics() -> SalesMetrics:
+    """Hər ehtimala qarşı boş / DEMO sales obyekti."""
+    return SalesMetrics(
+        total_revenue=0.0,
+        currency="USD",
+        orders_count=0,
+        conversion_rate=0.0,
+        avg_order_value=None,
+        atc_rate=None,
+        checkout_drop_rate=None,
+    )
+
+
 def _build_sales_block() -> Tuple[SalesMetrics, List[str]]:
     """
     Shopify satış məlumatlarını oxuyur.
     Əgər hər hansı problem olsa, DEMO rəqəmlər qaytarır və warning-lər verir.
     """
     sales_metrics, warnings = get_shopify_sales_metrics_safely()
+
+    # Defensive: heç vaxt None qalmasın
+    if sales_metrics is None:
+        sales_metrics = _fallback_sales_metrics()
+
+    if not warnings:
+        warnings = []
+
     return sales_metrics, warnings
 
 
@@ -152,13 +172,20 @@ def build_daily_report() -> DailyReport:
 
     # Sadə item list (monitor UI və ya gələcək mobil view üçün)
     items: List[DailyReportItem] = [
-        DailyReportItem(title="Total Revenue", value=f"{sales.total_revenue:.2f} {sales.currency}"),
+        DailyReportItem(
+            title="Total Revenue",
+            value=f"{sales.total_revenue:.2f} {sales.currency}",
+        ),
         DailyReportItem(title="Orders", value=sales.orders_count),
-        DailyReportItem(title="Conversion Rate", value=f"{sales.conversion_rate:.2f}%"),
+        DailyReportItem(
+            title="Conversion Rate",
+            value=f"{sales.conversion_rate:.2f}%",
+        ),
     ]
 
     key_warnings: List[str] = []
-    key_warnings.extend(sales_warnings)
+    if sales_warnings:
+        key_warnings.extend(sales_warnings)
 
     return DailyReport(
         generated_at_utc=generated_at_utc,
