@@ -1,19 +1,16 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-import os
-import requests
-from dataclasses import asdict  # ✅ DailyReport üçün
 
 from app.agents.ds.ds01_market_research import analyze_market, MarketResearchRequest
 from app.agents.core.msp import MSP
-from app.llm.brat_gpt import brat_gpt_chat   # <<--- DÜZGÜN IMPORT
+from app.llm.brat_gpt import brat_gpt_chat
 
-# ✅ Daily Report servis importları
 from app.reports.daily_report_service import (
     build_daily_report,
     generate_daily_report_text,
     send_daily_report_via_telegram,
 )
+from app.integrations.telegram_client import send_telegram_message
 
 app = FastAPI(title="BRAT Backend")
 
@@ -62,6 +59,7 @@ def market_analyze(req: MarketResearchRequest):
 #  DAILY COMMAND REPORT ENDPOINTLƏRİ
 # =========================
 
+
 @app.get("/daily-report/preview")
 def daily_report_preview():
     """
@@ -69,8 +67,9 @@ def daily_report_preview():
     Monitor UI və ya debug üçün.
     """
     report = build_daily_report()
-    # DailyReport dataclass olduğu üçün asdict ilə serialize edirik
-    return asdict(report)
+    # FastAPI dataclasses-i özü serialize edəcək (əgər model dataclass-dırsa).
+    # Əgər problem olsa, asdict(report) istifadə edə bilərik.
+    return report
 
 
 @app.get("/daily-report/text")
@@ -96,35 +95,6 @@ def daily_report_send():
 # =========================
 #  TELEGRAM MASTER AGENT
 # =========================
-
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-
-
-def send_telegram_message(chat_id: int, text: str):
-    """
-    Cavabı Telegram-a göndərir.
-    (Bu funksiya dialoq / komanda üçün, günlük report isə
-     ayrıca `app.integrations.telegram_client` ilə gedir.)
-    """
-    if not TELEGRAM_BOT_TOKEN:
-        print("TELEGRAM_BOT_TOKEN is not set")
-        return
-
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-
-    try:
-        requests.post(
-            url,
-            json={
-                "chat_id": chat_id,
-                "text": text,
-                "parse_mode": "Markdown",
-                "disable_web_page_preview": True,
-            },
-            timeout=15,
-        )
-    except Exception as e:
-        print("Telegram send error:", e)
 
 
 def handle_telegram_command(chat_id: int, text: str):
@@ -158,7 +128,7 @@ def handle_telegram_command(chat_id: int, text: str):
     if lower.startswith("msp:"):
         try:
             msp_command = text.split(":", 1)[1].strip()
-        except Exception:
+        except Exception:  # noqa: BLE001
             msp_command = ""
 
         if not msp_command:
@@ -171,7 +141,7 @@ def handle_telegram_command(chat_id: int, text: str):
 
         try:
             response = msp.process(msp_command)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             response = f"MSP error: {e}"
 
         send_telegram_message(chat_id, f"*MSP cavabı:*\n{response}")
@@ -208,7 +178,7 @@ def handle_telegram_command(chat_id: int, text: str):
                 chat_id,
                 f"*DS-01 Market Research nəticəsi:*\n\n{result}",
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             send_telegram_message(
                 chat_id,
                 "Komandanı oxuya bilmədim. Düzgün format nümunəsi:\n"
@@ -222,7 +192,7 @@ def handle_telegram_command(chat_id: int, text: str):
         reply = brat_gpt_chat(text)
         send_telegram_message(chat_id, reply)
         return
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         send_telegram_message(chat_id, f"BratGPT error: {e}")
         return
 
@@ -248,7 +218,7 @@ def telegram_webhook(update: TelegramUpdate):
             return {"ok": True}
 
         handle_telegram_command(chat_id, text)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print("Telegram webhook error:", e)
 
     return {"ok": True}
