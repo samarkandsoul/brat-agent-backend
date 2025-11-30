@@ -2,14 +2,12 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 
-# ---------- CORE SUB-SECTIONS ---------- #
-
 @dataclass
 class SalesMetrics:
     total_revenue: float
     currency: str
     orders_count: int
-    conversion_rate: float  # 0–100 (% as float)
+    conversion_rate: float  # percent (0–100)
     avg_order_value: Optional[float] = None
     atc_rate: Optional[float] = None
     checkout_drop_rate: Optional[float] = None
@@ -22,7 +20,7 @@ class AdsChannelMetrics:
     revenue: float
     impressions: int
     clicks: int
-    ctr: float        # %
+    ctr: float  # percent (0–100)
     cpc: Optional[float] = None
     cpm: Optional[float] = None
     roas: Optional[float] = None
@@ -59,8 +57,6 @@ class SystemHealthMetrics:
     incidents_last_24h: List[str] = field(default_factory=list)
 
 
-# ---------- TOP LEVEL REPORT ---------- #
-
 @dataclass
 class DailyReport:
     date_iso: str
@@ -69,6 +65,5 @@ class DailyReport:
     content: Optional[ContentProductionMetrics] = None
     life: Optional[LifeMetrics] = None
     system_health: Optional[SystemHealthMetrics] = None
-    # high-level summary line(s)
     headline: Optional[str] = None
     key_warnings: List[str] = field(default_factory=list)
