@@ -58,8 +58,6 @@ def market_analyze(req: MarketResearchRequest):
 # =========================
 #  DAILY COMMAND REPORT ENDPOINTLƏRİ
 # =========================
-
-
 @app.get("/daily-report/preview")
 def daily_report_preview():
     """
@@ -67,8 +65,6 @@ def daily_report_preview():
     Monitor UI və ya debug üçün.
     """
     report = build_daily_report()
-    # FastAPI dataclasses-i özü serialize edəcək (əgər model dataclass-dırsa).
-    # Əgər problem olsa, asdict(report) istifadə edə bilərik.
     return report
 
 
@@ -82,11 +78,13 @@ def daily_report_text():
     return {"text": text}
 
 
-@app.post("/daily-report/send")
+@app.api_route("/daily-report/send", methods=["GET", "POST"])
 def daily_report_send():
     """
     Daily report-u Telegram-a göndərir.
-    Render cron job məhz BU endpoint-i çağırmalıdır.
+
+    - GET  -> brauzerdən test üçün.
+    - POST -> Render cron job bu endpoint-i çağırır.
     """
     ok = send_daily_report_via_telegram()
     return {"status": "ok" if ok else "failed"}
@@ -95,8 +93,6 @@ def daily_report_send():
 # =========================
 #  TELEGRAM MASTER AGENT
 # =========================
-
-
 def handle_telegram_command(chat_id: int, text: str):
     """
     Burada əsas agent loqikasıdır:
