@@ -1,6 +1,10 @@
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
+
+# =========================
+#  CORE METRICS MODELLƏRİ
+# =========================
 
 @dataclass
 class SalesMetrics:
@@ -57,13 +61,46 @@ class SystemHealthMetrics:
     incidents_last_24h: List[str] = field(default_factory=list)
 
 
+# =========================
+#  REPORT İTEMLƏRİ
+# =========================
+
+@dataclass
+class DailyReportItem:
+    """
+    Sonda Telegram / Monitor üçün sadə list formatı.
+    Məs: title='Total Revenue', value='$123.45'
+    """
+    title: str
+    value: str | int | float | None
+
+
+# =========================
+#  ƏSAS DAILY REPORT MODEL
+# =========================
+
 @dataclass
 class DailyReport:
-    date_iso: str
+    # Yeni sistemdə istifadə olunan sahə – error da buradan gəlirdi
+    generated_at_utc: str
+
+    # Köhnə struktur üçün əlavə tarix sahəsi (istəsən istifadə edərik)
+    date_iso: str = ""
+
+    # Yuxarı səviyyə xülasə və statistiklər
+    summary: str = ""
+    stats: Dict[str, Any] = field(default_factory=dict)
+
+    # Sadə item list (Telegram, UI üçün)
+    items: List[DailyReportItem] = field(default_factory=list)
+
+    # Dərin analitika blokları – sənin əvvəlki dizaynından:
     sales: Optional[SalesMetrics] = None
     ads_channels: List[AdsChannelMetrics] = field(default_factory=list)
     content: Optional[ContentProductionMetrics] = None
     life: Optional[LifeMetrics] = None
     system_health: Optional[SystemHealthMetrics] = None
+
+    # Headline və xəbərdarlıqlar
     headline: Optional[str] = None
     key_warnings: List[str] = field(default_factory=list)
