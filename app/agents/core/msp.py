@@ -1,5 +1,7 @@
 from typing import Tuple, List, Dict, Any, Optional
 
+# MAMOS: loader path fixed (force redeploy marker)  <-- 🔥 force redeploy üçün sadə comment
+
 # TikTok Growth brain
 from app.agents.tiktok_growth.TGA_Main_Brain_manager import TikTokGrowthAgent
 
@@ -165,6 +167,11 @@ class MSP:
         # ==========================================================
         if lowered.startswith("mamos"):
             doc = self.load_mamos()
+
+            # Əgər loader error qaytardısa, preview əvəzinə xətanı göstər
+            if isinstance(doc, str) and doc.startswith("[MAMOS ERROR]"):
+                return "📜 MAMOS — Samarkand Soul Doctrine (error):\n\n" + doc
+
             preview = doc[:3500]
             return "📜 MAMOS — Samarkand Soul Doctrine (preview):\n\n" + preview
 
@@ -892,4 +899,4 @@ class MSP:
             "  • msp: calendar: upcoming | 5\n"
             "  • msp: gpt: Explain the Samarkand Soul brand in 3 sentences\n"
             "  • msp: tga: start  (TikTok Growth Agent daily cycle)\n"
-            )
+    )
