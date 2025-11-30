@@ -1,5 +1,7 @@
+# app/integrations/telegram_client.py
+
 import requests
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, Any
 
 from app.config.settings import settings
 from app.agents.core.telegram_brat_brain import TelegramBratBrain
@@ -19,8 +21,8 @@ def send_telegram_message(
     """
     Generic Telegram sender.
     Used by:
-      - main.py (webhook responses)
-      - reports (daily report, morning plan, etc.)
+      - main.py (webhook cavabları)
+      - reports (daily report, morning plan, və s.)
     """
     token = settings.TELEGRAM_BOT_TOKEN
 
@@ -70,14 +72,15 @@ def send_to_default_chat(text: str) -> bool:
 # ============================================================================
 
 
-def _extract_chat_and_text(update: dict) -> Tuple[Optional[int], Optional[str]]:
+def _extract_chat_and_text(update: Dict[str, Any]) -> Tuple[Optional[int], Optional[str]]:
     """
     Safely extract chat_id and incoming text from a Telegram update.
 
     Supports:
       - standard messages
       - edited messages (fallback)
-    Callback query-lər üçün ayrıca handler main.py tərəfdə istifadə oluna bilər.
+
+    Callback query-lər üçün ayrıca handler yazıla bilər (hazırda işlənmir).
     """
     if not update:
         return None, None
@@ -99,23 +102,14 @@ def _extract_chat_and_text(update: dict) -> Tuple[Optional[int], Optional[str]]:
     return chat_id, text
 
 
-def handle_telegram_update(update: dict) -> Optional[str]:
+def handle_telegram_update(update: Dict[str, Any]) -> Optional[str]:
     """
     Main entrypoint for Telegram webhook.
 
     - Gələn update-dən chat_id və text çıxarır
     - Mətni TelegramBratBrain-ə ötürür
     - Cavabı həmin user-ə geri göndərir
-    - Cavab mətnini (debug və ya log üçün) geri qaytarır
-
-    main.py içində tipik istifadə:
-        from app.integrations.telegram_client import handle_telegram_update
-
-        @app.post("/telegram/webhook")
-        async def telegram_webhook(request: Request):
-            data = await request.json()
-            reply_text = handle_telegram_update(data)
-            return {"ok": True}
+    - Cavab mətnini (debug üçün) geri qaytarır
     """
     chat_id, incoming_text = _extract_chat_and_text(update)
 
@@ -135,7 +129,6 @@ def handle_telegram_update(update: dict) -> Optional[str]:
             "Action: Human validation required.\n"
         )
 
-    # Cavabı user-ə göndər
     ok = send_telegram_message(chat_id, reply_text)
     if not ok:
         print("[telegram_client] Failed to send reply to chat:", chat_id)
