@@ -1,5 +1,3 @@
-from dataclasses import asdict
-
 from fastapi import FastAPI
 from pydantic import BaseModel
 
@@ -68,9 +66,10 @@ def daily_report_preview():
     """
     try:
         report = build_daily_report()
-        # dataclass -> dict
-        return {"status": "ok", "report": asdict(report)}
+        # FastAPI dataclass-ları özü serialize edə bilir.
+        return {"status": "ok", "report": report}
     except Exception as e:  # noqa: BLE001
+        # Debug üçün sadə error mesajı
         return {"status": "error", "error": str(e)}
 
 
@@ -96,7 +95,18 @@ def daily_report_send():
     """
     try:
         ok = send_daily_report_via_telegram()
-        return {"status": "ok" if ok else "failed"}
+        if ok:
+            return {"status": "ok"}
+        else:
+            # Burada artıq niyə failed olduğunu bir az izah edirik
+            return {
+                "status": "failed",
+                "error": (
+                    "send_daily_report_via_telegram() returned False. "
+                    "DEFAULT_CHAT_ID env dəyişənini və Telegram bot "
+                    "konfiqurasiyasını yoxla."
+                ),
+            }
     except Exception as e:  # noqa: BLE001
         return {"status": "error", "error": str(e)}
 
