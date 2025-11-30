@@ -14,11 +14,10 @@ class TelegramBratBrain:
 
     Məqsəd:
     - "BRAT:" / "ZAHID BRAT:" prefixlərini anlamaq
-    - msp: ... komandalarını birbaşa MSP-ə yönləndirmək
-    - "mamos" suallarını düzgün açmaq
-    - sadə qeyri-müəyyən suallarda (hava, Shopify məhsulu və s.) əvvəlcə
-      dəqiqləşdirici sual vermək
-    - qalan bütün sualları premium GPT dialoqa yönləndirmək
+    - msp: ... və mamos komandalarını birbaşa MSP-ə yönləndirmək
+    - Samarkand Soul sistem suallarında texniki, səmimi cavab vermək
+    - Qalan bütün suallarda premium Brat GPT dialoq davranışı vermək
+    - Normal suallara görə "ESCALATION" yazmamaq, əvəzində izah və ya sual vermək
     """
 
     def __init__(self) -> None:
@@ -40,7 +39,6 @@ class TelegramBratBrain:
             return ""
 
         raw = text.strip()
-
         lowers = raw.lower()
 
         prefixes = [
@@ -54,7 +52,6 @@ class TelegramBratBrain:
 
         for p in prefixes:
             if lowers.startswith(p):
-                # Nə qədər hissəni atacağımızı tapırıq
                 cut_len = len(p)
                 return raw[cut_len:].strip()
 
@@ -63,7 +60,7 @@ class TelegramBratBrain:
     @staticmethod
     def _is_msp_command(text: str) -> bool:
         """
-        Mətni MSP kimi qəbul etmək olar?
+        Mətni MSP/mamos kimi qəbul etmək olarmı?
         """
         if not text:
             return False
@@ -74,72 +71,71 @@ class TelegramBratBrain:
         if t.startswith("msp:") or t.startswith("msp "):
             return True
 
-        # Birbaşa "mamos" və ya "msp mamos" kimi halları da MSP-ə buraxa bilərik
+        # Birbaşa "mamos" yazılıbsa, onu da MSP-ə ötürürük
         if t.startswith("mamos"):
             return True
 
         return False
 
     @staticmethod
-    def _needs_weather_clarification(text: str) -> bool:
-        """
-        Hava ilə bağlı sual olsa da şəhər qeyd olunmayıbsa, soruşaq.
-        Çox sadə heuristic.
-        """
+    def _looks_like_weather_question(text: str) -> bool:
         if not text:
             return False
-
         lower = text.lower()
-
-        # Azərbaycan + İngilis:
-        has_weather_word = (
-            "hava" in lower
-            or "weather" in lower
-        )
-
-        # şəhər adları – sadə check (bakı, bəri, daşkənd və s. genişlənə bilər)
-        known_cities = [
-            "baki",
-            "baku",
-            "tashkent",
-            "daşkənd",
-            "istanbul",
-            "london",
-            "new york",
-        ]
-
-        if not has_weather_word:
-            return False
-
-        if any(city in lower for city in known_cities):
-            return False
-
-        return True
+        return "hava" in lower or "weather" in lower
 
     @staticmethod
-    def _needs_shopify_product_clarification(text: str) -> bool:
-        """
-        Shopify məhsul sualı var, amma konkret məhsul adı yoxdur → dəqiqləşdirmə ver.
-        """
+    def _looks_like_shopify_sales_question(text: str) -> bool:
         if not text:
             return False
-
         lower = text.lower()
-
         if "shopify" not in lower:
             return False
-
-        # Satış, məhsul, page və s. keçirsə amma konkret ad / id yoxdursa
-        has_product_context = any(
+        return any(
             kw in lower
-            for kw in ["məhsul", "product", "page", "satış", "sales"]
+            for kw in ["satış", "sales", "satis", "conversion", "məhsul səhifəsi", "product page"]
         )
 
-        if not has_product_context:
-            return False
+    # ------------------------------------------------------------------ #
+    #  Internal helpers for special domains
+    # ------------------------------------------------------------------ #
+    def _answer_weather(self, text: str) -> str:
+        """
+        Hava haqda sual üçün dürüst, sistemə uyğun cavab.
+        """
+        return (
+            "Zahid Brat, bizim hazırkı Samarkand Soul agent backend-ində "
+            "hava proqnozu üçün ayrıca servis qoşulmayıb – yəni real API-dən "
+            "hava məlumatı çəkə bilmirik.\n\n"
+            "Bu nə deməkdir?\n"
+            "- Telegram BRAT beyni hazırda Shopify, MAMOS, DS/LIFE/SYS agentləri və s. ilə "
+            "işləmək üçün qurulub.\n"
+            "- Hava proqnozu üçün ayrıca *Weather-Agent* və xarici API qoşmaq lazımdır.\n\n"
+            "Yəni indi ən praktik variant: telefonundakı hava tətbiqinə və ya brauzerdə hava saytına baxırsan. "
+            "Biz isə gələcəkdə istəsən DS/SYS xəritəsinə Weather-Agent əlavə edib bu hissəni də tam avtomatlaşdırarıq. 🌦"
+        )
 
-        # çox sadə heuristic – konkret məhsul adlarını və ya id-ləri tapmağa çalışmırıq
-        return True
+    def _answer_shopify_sales(self, text: str) -> str:
+        """
+        Shopify satış sualı – real metrikləri hələ oxumuruq, ona görə
+        vəziyyəti səmimi izah edir və növbəti addımı göstərir.
+        """
+        return (
+            "Zahid Brat, Shopify məhsul səhifəsində SATIŞ necə gedir sualı artıq "
+            "DS-12 / Analytics və real Shopify API oxuma səviyyəsinə girir.\n\n"
+            "Hazır vəziyyət:\n"
+            "- DS03 Shopify Agent məhsul yaratmaq, struktur qurmaq, səhifə kontentini yeniləmək üçündür.\n"
+            "- Shopify satış metrikləri (order sayı, conversion rate, add-to-cart və s.) üçün ayrıca "
+            "analytics layer hələ qoşulmayıb.\n\n"
+            "Növbəti mərhələ üçün plan belə olmalıdır:\n"
+            "1️⃣ DS-12 KPI & Analytics Agent üçün rəsmi MAMOS doktrina (C2_12_KPI_Analytics.md) aktivləşdirilir.\n"
+            "2️⃣ Shopify Admin API-dən raport/metrics oxuyan ayrıca modul yazılır (məs., `/shopify/analytics/...`).\n"
+            "3️⃣ MSP-ə belə komanda əlavə edilir:\n"
+            "    `msp: analytics: shopify | product=Samarkand Soul Demo Tablecloth`\n"
+            "4️⃣ Telegram BRAT bu komandanı DS-12 agentə yönləndirib real rəqəmlə cavab verir.\n\n"
+            "Yəni qısa cavab: hazırda sistem sənin Shopify-də *satışları oxumaq* gücündə deyil, "
+            "amma memarlıq artıq agent səviyyəsində hazırdır – növbəti texniki addım metrikləri oxuyan kodu yazmaqdır. 📊"
+        )
 
     # ------------------------------------------------------------------ #
     #  Main entrypoint
@@ -149,22 +145,27 @@ class TelegramBratBrain:
         Telegram-dan gələn hər mesaj üçün əsas giriş nöqtəsi.
         """
         if not raw_text:
-            return "Zahid Brat, boş mesaj gəldi. Zəhmət olmasa sualını və ya komandanı yaz. 🙂"
+            return (
+                "Zahid Brat, boş mesaj gəldi. "
+                "Zəhmət olmasa sualını və ya komandanı yaz. 🙂"
+            )
 
         # 1) BRAT / ZAHID BRAT prefiksini təmizlə
         text = self._strip_brat_prefix(raw_text)
         if not text:
-            return "Zahid Brat, mətn tapa bilmədim. Bir cümlə ilə də olsa yaz, mən davamını həll edim. 🙂"
+            return (
+                "Zahid Brat, mətn tapa bilmədim. "
+                "Bir cümlə ilə də olsa yaz, mən davamını həll edim. 🙂"
+            )
 
         lowered = text.lower().strip()
 
-        # 2) Əgər bu MSP/mamos tipli komandadırsa → birbaşa MSP-ə yönləndir
+        # 2) Əgər bu MSP/MAMOS tipli komandadırsa → birbaşa MSP-ə yönləndir
         if self._is_msp_command(text):
             try:
-                # MSP özü "msp:" prefiksini tanıyır, ona görə
-                # text-i olduğu kimi ötürə bilərik.
                 response = self.msp.process(text)
-                return f"MSP cavabı:\n{response}"
+                # Kiçik imza ki, həqiqətən bu beyin MSP cavabını qaytarır
+                return f"🧠 BRAT · MSP cavabı:\n{response}"
             except Exception as e:  # noqa: BLE001
                 return (
                     "ESCALATION\n"
@@ -172,33 +173,41 @@ class TelegramBratBrain:
                     "Action: Human validation required.\n"
                 )
 
-        # 3) Hava ilə bağlı qeyri-müəyyən sual → şəhər soruş
-        if self._needs_weather_clarification(text):
-            return (
-                "Zahid Brat, hava proqnozu üçün hansı şəhər lazımdır?\n"
-                "Məsələn: *Bakı*, *Daşkənd* və ya başqa şəhər adı ilə yaz: \n"
-                "`BRAT: Bakı üçün hava necədir?`"
-            )
+        # 3) Hava sualı → öz xüsusi cavabımız
+        if self._looks_like_weather_question(text):
+            return self._answer_weather(text)
 
-        # 4) Shopify məhsul sualı qeyri-müəyyəndirsə → məhsulu dəqiqləşdir
-        if self._needs_shopify_product_clarification(text):
-            return (
-                "Zahid Brat, Shopify-də bir neçə məhsul ola bilər.\n"
-                "Sənə konkret hansı məhsulun satışı maraqlıdır?\n\n"
-                "Məsələn belə yaz:\n"
-                "`BRAT: Shopify-də 'Samarkand Soul Demo Tablecloth' məhsulunun satışı necə gedir?`"
-            )
+        # 4) Shopify satış sualı → öz xüsusi cavabımız
+        if self._looks_like_shopify_sales_question(text):
+            return self._answer_shopify_sales(text)
 
-        # 5) Əks halda – Brat GPT dialoqa göndər
+        # 5) Qalan bütün suallar → premium Brat GPT dialoqa göndər
+        dialog_prompt = (
+            "You are GPT BRAT, the personal AI co-founder and Telegram assistant of "
+            "Zahid Brat for the Samarkand Soul brand.\n\n"
+            "Context:\n"
+            "- Brand tone: premium calm luxury, honest, minimal, non-clickbait.\n"
+            "- You operate inside a Telegram bot as 'BRAT'.\n"
+            "- There is a separate MSP command router that handles `msp:` and system agents.\n\n"
+            "Critical rules for THIS TELEGRAM DIALOG ROLE:\n"
+            "1. Do NOT answer with 'ESCALATION' for normal user questions.\n"
+            "2. If the question is unclear or missing key info, ask ONE short clarifying question instead of refusing.\n"
+            "3. Be concrete, practical and system-aware: you know about Samarkand Soul, MAMOS, DS/LIFE/SYS agents, Render, GitHub, Shopify, etc.\n"
+            "4. Always answer in the same language as the user (here: Azerbaijani is primary, with English tech terms allowed).\n"
+            "5. Keep answers focused; no unnecessary long intros.\n\n"
+            f"User message:\n{text}\n"
+        )
+
         try:
             reply = brat_gpt_chat(
-                user_prompt=text,
+                user_prompt=dialog_prompt,
                 agent_role="Telegram BRAT Dialog Brain",
             )
-            return reply
+            # Kiçik imza ilə – bunu görürüksə, demək BRAT beyni işləyir
+            return f"🧠 BRAT · {reply}"
         except Exception as e:  # noqa: BLE001
             return (
                 "ESCALATION\n"
                 f"Reason: Internal GPT error: {e}\n"
                 "Action: Human validation required.\n"
-                )
+        )
