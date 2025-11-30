@@ -2,11 +2,18 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import os
 import requests
+from dataclasses import asdict  # ✅ DailyReport üçün
 
 from app.agents.ds.ds01_market_research import analyze_market, MarketResearchRequest
 from app.agents.core.msp import MSP
 from app.llm.brat_gpt import brat_gpt_chat   # <<--- DÜZGÜN IMPORT
 
+# ✅ Daily Report servis importları
+from app.reports.daily_report_service import (
+    build_daily_report,
+    generate_daily_report_text,
+    send_daily_report_via_telegram,
+)
 
 app = FastAPI(title="BRAT Backend")
 
@@ -52,6 +59,41 @@ def market_analyze(req: MarketResearchRequest):
 
 
 # =========================
+#  DAILY COMMAND REPORT ENDPOINTLƏRİ
+# =========================
+
+@app.get("/daily-report/preview")
+def daily_report_preview():
+    """
+    DailyReport obyektini xam JSON kimi qaytarır.
+    Monitor UI və ya debug üçün.
+    """
+    report = build_daily_report()
+    # DailyReport dataclass olduğu üçün asdict ilə serialize edirik
+    return asdict(report)
+
+
+@app.get("/daily-report/text")
+def daily_report_text():
+    """
+    Telegram-a göndəriləcək formatlanmış mətnin preview versiyası.
+    Brauzerdə açıb necə göründüyünü test edə bilərsən.
+    """
+    text = generate_daily_report_text()
+    return {"text": text}
+
+
+@app.post("/daily-report/send")
+def daily_report_send():
+    """
+    Daily report-u Telegram-a göndərir.
+    Render cron job məhz BU endpoint-i çağırmalıdır.
+    """
+    ok = send_daily_report_via_telegram()
+    return {"status": "ok" if ok else "failed"}
+
+
+# =========================
 #  TELEGRAM MASTER AGENT
 # =========================
 
@@ -61,6 +103,8 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 def send_telegram_message(chat_id: int, text: str):
     """
     Cavabı Telegram-a göndərir.
+    (Bu funksiya dialoq / komanda üçün, günlük report isə
+     ayrıca `app.integrations.telegram_client` ilə gedir.)
     """
     if not TELEGRAM_BOT_TOKEN:
         print("TELEGRAM_BOT_TOKEN is not set")
