@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import asdict
 from datetime import datetime, timezone
-from typing import List
-import os
+from typing import List, Tuple
 
 from app.reports.daily_report_models import (
     DailyReport,
+    DailyReportItem,
     SalesMetrics,
     AdsChannelMetrics,
     ContentProductionMetrics,
@@ -16,32 +17,31 @@ from app.reports.daily_report_models import (
     SystemHealthMetrics,
 )
 from app.integrations.telegram_client import send_telegram_message
+from app.integrations.shopify_sales.sales_service import (
+    get_shopify_sales_metrics_safely,
+)
+
+# Telegram üçün default chat id
+DEFAULT_CHAT_ID: int = int(os.getenv("DEFAULT_CHAT_ID", "0") or 0)
 
 
-# Telegram üçün default chat id (Render Environment-də DEFAULT_CHAT_ID kimi saxlayırsan)
-DEFAULT_CHAT_ID: int = int(os.getenv("DEFAULT_CHAT_ID", "0"))
+# ==========================================================
+#  BLOK QURAN FUNKSİYALAR
+# ==========================================================
 
-
-def _build_sales_block() -> SalesMetrics:
+def _build_sales_block() -> Tuple[SalesMetrics, List[str]]:
     """
-    Burada hələ real Shopify inteqrasiya yoxdur, ona görə DEMO rəqəmlər qaytarırıq.
-    Sonra Shopify agenti ilə əvəz edəcəyik.
+    Shopify satış məlumatlarını oxuyur.
+    Əgər hər hansı problem olsa, DEMO rəqəmlər qaytarır və warning-lər verir.
     """
-    return SalesMetrics(
-        total_revenue=0.0,
-        currency="USD",
-        orders_count=0,
-        conversion_rate=0.0,
-        avg_order_value=None,
-        atc_rate=None,
-        checkout_drop_rate=None,
-    )
+    sales_metrics, warnings = get_shopify_sales_metrics_safely()
+    return sales_metrics, warnings
 
 
 def _build_ads_block() -> List[AdsChannelMetrics]:
     """
-    Reklam kanalları üçün DEMO məlumat.
-    Gələcəkdə Meta/TikTok API-lərindən real rəqəmlər gələcək.
+    Reklam kanalları üçün hələ DEMO məlumat.
+    Gələcəkdə Meta/TikTok API-lərindən real data gələcək.
     """
     meta = AdsChannelMetrics(
         channel_name="Meta",
@@ -106,24 +106,66 @@ def _build_system_health_block() -> SystemHealthMetrics:
     )
 
 
+# ==========================================================
+#  ƏSAS REPORT BUILDER
+# ==========================================================
+
 def build_daily_report() -> DailyReport:
     """
     Bütün blokları birləşdirib DailyReport obyektini yaradır.
-    QƏDİM 'generated_at_utc' və s. field-lər YOXDUR – yalnız sənin dataclass-larındakı field-lər var.
+    Bu model artıq:
+      - generated_at_utc
+      - summary, stats, items
+      - dərin bloklar (sales, ads, content, life, system_health)
+      - headline + warnings
+    sahələrini dəstəkləyir.
     """
-    today_iso = datetime.now(timezone.utc).date().isoformat()
+    now_utc = datetime.now(timezone.utc)
+    generated_at_utc = now_utc.isoformat()
+    date_iso = now_utc.date().isoformat()
 
-    sales = _build_sales_block()
+    # 1) Sales – Shopify üzərindən
+    sales, sales_warnings = _build_sales_block()
+
+    # 2) Ads (DEMO)
     ads_channels = _build_ads_block()
+
+    # 3) Content (DEMO)
     content = _build_content_block()
+
+    # 4) Life (DEMO)
     life = _build_life_block()
+
+    # 5) System health
     system = _build_system_health_block()
 
-    headline = "Samarkand Soul – Daily Report (DEMO mode)"
+    # Sadə headline və summary
+    headline = "Samarkand Soul – Daily Report (DEMO + Shopify sales)"
+    summary = "Core metrics for sales, ads, content, life & system health."
+
+    # Sadə stats dict (gələcəkdə UI üçün)
+    stats = {
+        "total_revenue": sales.total_revenue,
+        "orders_count": sales.orders_count,
+        "ads_channels": len(ads_channels),
+    }
+
+    # Sadə item list (monitor UI və ya gələcək mobil view üçün)
+    items: List[DailyReportItem] = [
+        DailyReportItem(title="Total Revenue", value=f"{sales.total_revenue:.2f} {sales.currency}"),
+        DailyReportItem(title="Orders", value=sales.orders_count),
+        DailyReportItem(title="Conversion Rate", value=f"{sales.conversion_rate:.2f}%"),
+    ]
+
     key_warnings: List[str] = []
+    key_warnings.extend(sales_warnings)
 
     return DailyReport(
-        date_iso=today_iso,
+        generated_at_utc=generated_at_utc,
+        date_iso=date_iso,
+        summary=summary,
+        stats=stats,
+        items=items,
         sales=sales,
         ads_channels=ads_channels,
         content=content,
@@ -134,6 +176,10 @@ def build_daily_report() -> DailyReport:
     )
 
 
+# ==========================================================
+#  FORMATLANMIŞ MƏTN (Telegram üçün)
+# ==========================================================
+
 def generate_daily_report_text() -> str:
     """
     DailyReport obyektini insan oxuyan formatlı mətnə çevirir (Telegram üçün).
@@ -142,10 +188,8 @@ def generate_daily_report_text() -> str:
 
     lines: List[str] = []
     lines.append(f"📊 *Samarkand Soul Daily Report* — {report.date_iso}")
-
     if report.headline:
         lines.append(f"⭐ _{report.headline}_")
-
     lines.append("")
 
     # --- Sales ---
@@ -154,23 +198,27 @@ def generate_daily_report_text() -> str:
         lines.append("💰 *SALES*")
         lines.append(
             f"- Revenue: {s.total_revenue:.2f} {s.currency} "
-            f"(orders: {s.orders_count}, CR: {s.conversion_rate:.1f}%)"
+            f"(orders: {s.orders_count}, CR: {s.conversion_rate:.2f}%)"
         )
         if s.avg_order_value is not None:
             lines.append(f"- AOV: {s.avg_order_value:.2f} {s.currency}")
         if s.atc_rate is not None:
-            lines.append(f"- Add-to-cart rate: {s.atc_rate:.1f}%")
+            lines.append(f"- Add-to-cart rate: {s.atc_rate:.2f}%")
         if s.checkout_drop_rate is not None:
-            lines.append(f"- Checkout drop: {s.checkout_drop_rate:.1f}%")
+            lines.append(f"- Checkout drop: {s.checkout_drop_rate:.2f}%")
         lines.append("")
 
     # --- Ads ---
     if report.ads_channels:
         lines.append("📣 *ADS & TRAFFIC*")
         for ch in report.ads_channels:
-            lines.append(f"- {ch.channel_name}: spend {ch.spend:.2f}, revenue {ch.revenue:.2f}")
             lines.append(
-                f"  impressions {ch.impressions}, clicks {ch.clicks}, CTR {ch.ctr:.2f}%"
+                f"- {ch.channel_name}: spend {ch.spend:.2f}, "
+                f"revenue {ch.revenue:.2f}"
+            )
+            lines.append(
+                f"  impressions {ch.impressions}, clicks {ch.clicks}, "
+                f"CTR {ch.ctr:.2f}%"
             )
             if ch.roas is not None:
                 lines.append(f"  ROAS: {ch.roas:.2f}x")
@@ -231,6 +279,7 @@ def generate_daily_report_text() -> str:
             lines.append("- Incidents last 24h: none ✅")
         lines.append("")
 
+    # --- Warnings ---
     if report.key_warnings:
         lines.append("⚠️ *WARNINGS*")
         for w in report.key_warnings:
@@ -238,6 +287,10 @@ def generate_daily_report_text() -> str:
 
     return "\n".join(lines)
 
+
+# ==========================================================
+#  TELEGRAM GÖNDƏR
+# ==========================================================
 
 def send_daily_report_via_telegram() -> bool:
     """
