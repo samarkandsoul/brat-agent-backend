@@ -1,6 +1,6 @@
 from typing import Tuple, List, Dict, Any, Optional
 
-# MAMOS: loader path fixed (force redeploy marker)  <-- 🔥 force redeploy üçün sadə comment
+# MAMOS: loader path fixed (force redeploy marker)
 
 # TikTok Growth brain
 from app.agents.tiktok_growth.TGA_Main_Brain_manager import TikTokGrowthAgent
@@ -9,7 +9,7 @@ from app.agents.tiktok_growth.TGA_Main_Brain_manager import TikTokGrowthAgent
 from app.agents.ds.ds02_drive_agent import DriveAgent
 
 # MAMOS – unified doctrine loader
-from app.mamos.mamos_loader import MAMOSLoader
+from app.mamos.MAMOS.mamos_loader import MAMOSLoader
 
 # Brat GPT – unified LLM interface (MAMOS-aware)
 from app.llm.brat_gpt import brat_gpt_chat
