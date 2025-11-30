@@ -1,12 +1,11 @@
-# app/main.py  (əgər adı başqa idisə – FastAPI start faylın hansıdırsa, onu əvəz et)
+# app/main.py
 
 from fastapi import FastAPI
-from pydantic import BaseModel
 
-from app.agents.ds.ds01_market_research import analyze_market, MarketResearchRequest
-from app.agents.core.msp import MSP
-from app.llm.brat_gpt import brat_gpt_chat
-
+from app.agents.ds.ds01_market_research import (
+    analyze_market,
+    MarketResearchRequest,
+)
 from app.reports.daily_report_service import (
     build_daily_report,
     generate_daily_report_text,
@@ -17,15 +16,9 @@ from app.reports.morning_plan_service import (
     generate_morning_plan_text,
     send_morning_plan_via_telegram,
 )
-from app.integrations.telegram_client import send_telegram_message
+from app.integrations.telegram_client import handle_telegram_update
 
 app = FastAPI(title="BRAT Backend")
-
-# =========================
-#  MSP CORE
-# =========================
-msp = MSP()
-
 
 # =========================
 #  ROOT CHECK
@@ -65,7 +58,6 @@ def market_analyze(req: MarketResearchRequest):
 # =========================
 #  DAILY REPORT ENDPOINTLƏRİ
 # =========================
-
 @app.get("/daily-report/preview")
 def daily_report_preview():
     """
@@ -90,9 +82,6 @@ def daily_report_text():
         return {"status": "error", "error": str(e)}
 
 
-from fastapi import APIRouter  # lazımsız olsa da qalmağı problem deyil
-
-
 @app.api_route("/daily-report/send", methods=["GET", "POST"])
 def daily_report_send():
     """
@@ -106,8 +95,10 @@ def daily_report_send():
             return {"status": "ok"}
         return {
             "status": "failed",
-            "error": "send_daily_report_via_telegram() returned False. "
-                     "DEFAULT_CHAT_ID env dəyərini və Telegram bot konfiqurasiyasını yoxla.",
+            "error": (
+                "send_daily_report_via_telegram() returned False. "
+                "DEFAULT_CHAT_ID env dəyərini və Telegram bot konfiqurasiyasını yoxla."
+            ),
         }
     except Exception as e:  # noqa: BLE001
         return {"status": "error", "error": str(e)}
@@ -116,7 +107,6 @@ def daily_report_send():
 # =========================
 #  MORNING PLAN ENDPOINTLƏRİ
 # =========================
-
 @app.get("/morning-plan/preview")
 def morning_plan_preview():
     """
@@ -154,135 +144,33 @@ def morning_plan_send():
             return {"status": "ok"}
         return {
             "status": "failed",
-            "error": "send_morning_plan_via_telegram() returned False. "
-                     "DEFAULT_CHAT_ID env dəyərini və Telegram bot konfiqurasiyasını yoxla.",
+            "error": (
+                "send_morning_plan_via_telegram() returned False. "
+                "DEFAULT_CHAT_ID env dəyərini və Telegram bot konfiqurasiyasını yoxla."
+            ),
         }
     except Exception as e:  # noqa: BLE001
         return {"status": "error", "error": str(e)}
 
 
 # =========================
-#  TELEGRAM MASTER AGENT
+#  TELEGRAM WEBHOOK (BRAT DIALOQ BEYNİ)
 # =========================
-
-
-def handle_telegram_command(chat_id: int, text: str):
-    """
-    Telegram komanda router-i.
-    """
-    lower = text.strip().lower()
-
-    # 1) /start komandası
-    if lower.startswith("/start") or lower.startswith("start"):
-        msg = (
-            "Salam, mən BRAT Core agentiyəm. Hal-hazırda bu komandaları bacarıram:\n\n"
-            "*MSP test:*\n"
-            "`msp: hər hansı komanda`\n\n"
-            "*Market araşdırması (DS-01):*\n"
-            "`market: Niche | Country`\n\n"
-            "Məsələn:\n"
-            "`market: pet hair remover | US`\n\n"
-            "*Brat GPT dialoq:*\n"
-            "Adi sualını yaz, mən sənin GPT Brat ekizin kimi cavab verim. 🧠"
-        )
-        send_telegram_message(chat_id, msg)
-        return
-
-    # 2) MSP komandası (msp: ... )
-    if lower.startswith("msp:"):
-        try:
-            msp_command = text.split(":", 1)[1].strip()
-        except Exception:  # noqa: BLE001
-            msp_command = ""
-
-        if not msp_command:
-            send_telegram_message(
-                chat_id,
-                "MSP komandası boşdur. Format nümunəsi:\n"
-                "`msp: bugünkü tapşırıqlarım nədir?`",
-            )
-            return
-
-        try:
-            response = msp.process(msp_command)
-        except Exception as e:  # noqa: BLE001
-            response = f"MSP error: {e}"
-
-        send_telegram_message(chat_id, f"*MSP cavabı:*\n{response}")
-        return
-
-    # 3) DS-01 Market Research komandası
-    if lower.startswith("market:"):
-        try:
-            after_keyword = text.split(":", 1)[1].strip()
-            parts = [p.strip() for p in after_keyword.split("|")]
-
-            niche = parts[0] if len(parts) >= 1 else ""
-            country = parts[1] if len(parts) >= 2 else "US"
-
-            if not niche:
-                send_telegram_message(
-                    chat_id,
-                    "Niche boşdur. Format belə olmalıdır:\n"
-                    "`market: pet hair remover | US`",
-                )
-                return
-
-            req = MarketResearchRequest(niche=niche, country=country)
-            result = analyze_market(req)
-
-            if isinstance(result, dict) and "error" in result:
-                send_telegram_message(
-                    chat_id,
-                    f"DS-01 error:\n`{result}`",
-                )
-                return
-
-            send_telegram_message(
-                chat_id,
-                f"*DS-01 Market Research nəticəsi:*\n\n{result}",
-            )
-        except Exception as e:  # noqa: BLE001
-            send_telegram_message(
-                chat_id,
-                "Komandanı oxuya bilmədim. Düzgün format nümunəsi:\n"
-                "`market: pet hair remover | US`\n\n"
-                f"Xəta: `{e}`",
-            )
-        return
-
-    # 4) Brat GPT dialoq rejimi — qalan bütün mesajlar üçün
-    try:
-        reply = brat_gpt_chat(text)
-        send_telegram_message(chat_id, reply)
-        return
-    except Exception as e:  # noqa: BLE001
-        send_telegram_message(chat_id, f"BratGPT error: {e}")
-        return
-
-
-class TelegramUpdate(BaseModel):
-    update_id: int | None = None
-    message: dict | None = None
-
-
 @app.post("/tg/webhook")
-def telegram_webhook(update: TelegramUpdate):
+def telegram_webhook(update: dict):
     """
     Telegram webhook endpoint.
-    Bot mesajı buraya göndərəcək, biz də handle_telegram_command işə salacağıq.
+
+    Telegram bu endpoint-ə JSON `update` göndərir.
+    Biz də update-i birbaşa `handle_telegram_update`-ə ötürürük.
+    Orada:
+      - chat_id + text çıxarılır
+      - TelegramBratBrain.process(...) çağırılır
+      - cavab geri həmin user-ə göndərilir
     """
     try:
-        message = update.message or {}
-        chat = message.get("chat") or {}
-        chat_id = chat.get("id")
-        text = message.get("text", "")
-
-        if not chat_id or not text:
-            return {"ok": True}
-
-        handle_telegram_command(chat_id, text)
+        reply_text = handle_telegram_update(update)
+        return {"ok": True, "reply": reply_text}
     except Exception as e:  # noqa: BLE001
         print("Telegram webhook error:", e)
-
-    return {"ok": True}
+        return {"ok": False, "error": str(e)}
