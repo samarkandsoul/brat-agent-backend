@@ -14,9 +14,6 @@ from app.mamos.MAMOS.mamos_loader import MAMOSLoader
 # Brat GPT – unified LLM interface (MAMOS-aware)
 from app.llm.brat_gpt import brat_gpt_chat
 
-# WEB-CORE-01 – Intel / web search agent
-from app.intel.web_core import WebCoreAgent, IntelSearchRequest
-
 
 class MSP:
     """
@@ -165,39 +162,6 @@ class MSP:
 
             preview = doc[:3500]
             return "📜 MAMOS — Samarkand Soul Doctrine (preview):\n\n" + preview
-
-        # ==========================================================
-        # 0.3) INTEL / WEB-CORE-01 — central web search brain
-        # ==========================================================
-        if lowered.startswith("intel:") or lowered.startswith("news:"):
-            # msp: intel: today world news
-            # msp: news: ecommerce trends for tablecloth niche
-            if lowered.startswith("intel:"):
-                body = text[len("intel:"):].strip()
-            else:
-                body = text[len("news:"):].strip()
-
-            if not body:
-                return (
-                    "Intel agent commands:\n"
-                    "  • msp: intel: today world news\n"
-                    "  • msp: news: ecommerce trends for tablecloth niche\n"
-                )
-
-            # Tag-lar – sadə variant
-            tags: List[str] = ["INTEL"]
-            if "news" in body.lower() or lowered.startswith("news:"):
-                tags.append("NEWS")
-
-            req = IntelSearchRequest(query=body, tags=tags)
-            agent = WebCoreAgent()
-
-            try:
-                # WebCoreAgent artıq sənin üçün web search edib
-                # formatlanmış mətn qaytarır
-                return agent.handle_query(req)
-            except Exception as e:  # noqa: BLE001
-                return f"MSP error: WEB-CORE-01 routing failed: {e}"
 
         # ==========================================================
         # 0.5) DAILY REPORT AGENT (sales + life + system)
@@ -520,7 +484,7 @@ class MSP:
             )
 
         # ==========================================================
-        # 3.55) WEB RESEARCH AGENT — Internet access (low-level)
+        # 3.55) WEB RESEARCH AGENT — Internet access
         # ==========================================================
         if lowered.startswith("web:"):
             raw_body = text[len("web:"):].strip()
@@ -717,6 +681,173 @@ class MSP:
                 "  • msp: calendar: upcoming | 5\n"
                 "  • msp: cal: today | 10\n"
             )
+
+        # ==========================================================
+        # 3.58) INTEL / WEB-CORE-01 — central web search brain
+        # ==========================================================
+        if lowered.startswith("intel:") or lowered.startswith("news:"):
+            if lowered.startswith("intel:"):
+                body = text[len("intel:"):].strip()
+            else:
+                body = text[len("news:"):].strip()
+
+            if not body:
+                return (
+                    "Intel agent commands:\n"
+                    "  • msp: intel: today world news\n"
+                    "  • msp: news: ecommerce trends for tablecloth niche\n"
+                )
+
+            try:
+                from app.intel.web_core import WebCoreAgent, IntelSearchRequest
+            except Exception as e:  # pylint: disable-broad-except
+                return f"MSP error: WEB-CORE-01 import failed: {e}"
+
+            agent = WebCoreAgent()
+            req = IntelSearchRequest(
+                query=body,
+                tags=["INTEL", "NEWS"],
+            )
+
+            try:
+                result_text = agent.handle_query(req)
+            except Exception as e:  # pylint: disable-broad-except
+                return f"MSP error: WEB-CORE-01 failed: {e}"
+
+            return result_text
+
+        # ==========================================================
+        # 3.8) DS-LAUNCH-01 — semi-automatic product launch pipeline
+        # ==========================================================
+        if lowered.startswith("launch:") or lowered.startswith("ds_launch:"):
+            if lowered.startswith("launch:"):
+                body = text[len("launch:"):].strip()
+            else:
+                body = text[len("ds_launch:"):].strip()
+
+            if not body:
+                return (
+                    "Launch agent format:\n"
+                    "  msp: launch: Niche | Country | Target customer | Price hint | Extra notes\n"
+                    "Example:\n"
+                    "  msp: launch: pet hair remover | US | women 25–45 with pets | 24.90 | TikTok-friendly, impulse buy\n"
+                )
+
+            parts = [p.strip() for p in body.split("|")]
+            niche = parts[0] if len(parts) > 0 else ""
+            country = parts[1] if len(parts) > 1 else "US"
+            target_customer = parts[2] if len(parts) > 2 else "general audience"
+            price_hint = parts[3] if len(parts) > 3 else ""
+            extra_notes = " | ".join(parts[4:]) if len(parts) > 4 else ""
+
+            if not niche:
+                return (
+                    "MSP error: Launch niche cannot be empty.\n"
+                    "Example:\n"
+                    "  msp: launch: pet hair remover | US | women 25–45 with pets | 24.90 | TikTok-friendly, impulse buy\n"
+                )
+
+            lines: List[str] = []
+            lines.append("🚀 *DS-LAUNCH-01 — Semi-automatic launch pipeline (70% AI)*")
+            lines.append("")
+            lines.append(f"Niche: `{niche}`  |  Country: `{country}`")
+            lines.append(f"Target: `{target_customer}`")
+            if price_hint:
+                lines.append(f"Price hint: `{price_hint}`")
+            if extra_notes:
+                lines.append(f"Notes: {extra_notes}")
+            lines.append("")
+
+            # ---- DS-01: Market research ----
+            try:
+                from app.agents.ds.ds01_market_research import (
+                    analyze_market,
+                    MarketResearchRequest,
+                )
+
+                mr_req = MarketResearchRequest(niche=niche, country=country)
+                mr_result = analyze_market(mr_req)
+                mr_preview = (mr_result or "")[:1500]
+                lines.append("📊 *DS-01 — Market Research (preview)*")
+                lines.append(mr_preview)
+                if mr_result and len(mr_result) > len(mr_preview):
+                    lines.append("... (truncated, full report via msp: market: ...)")
+                lines.append("")
+            except Exception as e:  # pylint: disable-broad-except
+                lines.append(f"❌ DS-01 Market Research failed: {e}")
+                lines.append("")
+
+            # ---- DS-21: Product auto creator ----
+            try:
+                from app.agents.ds.ds21_product_auto_creator import (
+                    ProductAutoCreator,
+                    ProductIdea,
+                )
+
+                creator = ProductAutoCreator()
+                idea = ProductIdea(
+                    title_seed=f"Samarkand Soul {niche.title()}",
+                    style_brief=extra_notes or "calm luxury, minimalist, TikTok-optimized",
+                    price_hint=price_hint,
+                    extra_info=f"Target customer: {target_customer}",
+                )
+                product_block = creator.create_full_product(idea)
+                lines.append("🧪 *DS-21 — Product concept*")
+                lines.append(product_block)
+                lines.append("")
+            except Exception as e:  # pylint: disable-broad-except
+                lines.append(f"❌ DS-21 ProductAutoCreator failed: {e}")
+                lines.append("")
+
+            # ---- DS-22: Image auto agent ----
+            try:
+                from app.agents.ds.ds22_image_auto_agent import (
+                    ImageAutoAgent,
+                    ImageIdea,
+                )
+
+                img_agent = ImageAutoAgent()
+                img_idea = ImageIdea(
+                    product_name=f"Samarkand Soul {niche.title()}",
+                    use_case="product page hero + TikTok ads",
+                    style_notes=extra_notes or "warm, minimalist, calm luxury, UGC-friendly",
+                    extra_info=f"Target customer: {target_customer}",
+                )
+                image_plan = img_agent.generate_image_plan(img_idea)
+                lines.append("🖼 *DS-22 — Image & creative plan*")
+                lines.append(image_plan)
+                lines.append("")
+            except Exception as e:  # pylint: disable-broad-except
+                lines.append(f"❌ DS-22 ImageAutoAgent failed: {e}")
+                lines.append("")
+
+            # ---- DS-05: Product page copy ----
+            try:
+                from app.agents.ds.ds05_product_page_copywriter import (
+                    generate_product_page_copy_from_text,
+                )
+
+                copy_brief = (
+                    f"Samarkand Soul {niche.title()} | {niche} niche | "
+                    f"{target_customer} | main benefit: solve their key pain quickly | {extra_notes}"
+                )
+                copy_block = generate_product_page_copy_from_text(copy_brief)
+                lines.append("📝 *DS-05 — Product page copy (draft)*")
+                lines.append(copy_block)
+                lines.append("")
+            except Exception as e:  # pylint: disable-broad-except
+                lines.append(f"❌ DS-05 Product Page Copywriter failed: {e}")
+                lines.append("")
+
+            lines.append(
+                "✅ Human commander TODO:\n"
+                "  1) Choose final product variant & price.\n"
+                "  2) Approve / edit product page copy.\n"
+                "  3) Brief creatives based on DS-22 image plan.\n"
+                "  4) Push to Shopify via DS03 agent (msp: shopify: ...).\n"
+            )
+
+            return "\n".join(lines)
 
         # ==========================================================
         # 3.8) DS-21 PRODUCT AUTO CREATOR
@@ -935,6 +1066,7 @@ class MSP:
             "  • msp: calendar: upcoming | 5\n"
             "  • msp: intel: today world news\n"
             "  • msp: news: ecommerce trends for tablecloth niche\n"
+            "  • msp: launch: pet hair remover | US | women 25–45 with pets | 24.90 | TikTok-friendly, impulse buy\n"
             "  • msp: gpt: Explain the Samarkand Soul brand in 3 sentences\n"
             "  • msp: tga: start  (TikTok Growth Agent daily cycle)\n"
-        )
+            )
