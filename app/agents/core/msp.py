@@ -683,6 +683,64 @@ class MSP:
             )
 
         # ==========================================================
+        # 3.58) INTEL / WEB-CORE-01 — central web search brain
+        # ==========================================================
+        if lowered.startswith("intel:") or lowered.startswith("news:"):
+            if lowered.startswith("intel:"):
+                body = text[len("intel:"):].strip()
+            else:
+                body = text[len("news:"):].strip()
+
+            if not body:
+                return (
+                    "Intel agent commands:\n"
+                    "  • msp: intel: today world news\n"
+                    "  • msp: news: ecommerce trends for tablecloth niche\n"
+                )
+
+            try:
+                from app.intel.web_core import WebCoreAgent, IntelSearchRequest
+            except Exception as e:  # pylint: disable-broad-except
+                return f"MSP error: WEB-CORE-01 import failed: {e}"
+
+            agent = WebCoreAgent()
+            req = IntelSearchRequest(
+                query=body,
+                intent_tags=["INTEL", "NEWS"],
+            )
+
+            try:
+                result = agent.route(req)
+            except Exception as e:  # pylint: disable-broad-except
+                return f"MSP error: WEB-CORE-01 routing failed: {e}"
+
+            lines: List[str] = []
+            lines.append("🛰 *WEB-CORE-01 — Intel summary*")
+            lines.append("")
+            lines.append(result.summary)
+            lines.append("")
+
+            if result.bullets:
+                for b in result.bullets:
+                    lines.append(f"- {b}")
+                lines.append("")
+
+            if result.action_items:
+                lines.append("Next steps:")
+                for a in result.action_items:
+                    lines.append(f"  • {a}")
+                lines.append("")
+
+            if result.sources:
+                lines.append("Sources:")
+                for s in result.sources[:3]:
+                    title = s.title or s.url
+                    provider = f" [{s.provider}]" if s.provider else ""
+                    lines.append(f"  • {title}{provider}")
+
+            return "\n".join(lines)
+
+        # ==========================================================
         # 3.8) DS-21 PRODUCT AUTO CREATOR
         # ==========================================================
         if lowered.startswith("product:") or lowered.startswith("ds21:"):
@@ -897,6 +955,8 @@ class MSP:
             "  • msp: web: fetch | https://example.com\n"
             "  • msp: gmail: unread | 5\n"
             "  • msp: calendar: upcoming | 5\n"
+            "  • msp: intel: today world news\n"
+            "  • msp: news: ecommerce trends for tablecloth niche\n"
             "  • msp: gpt: Explain the Samarkand Soul brand in 3 sentences\n"
             "  • msp: tga: start  (TikTok Growth Agent daily cycle)\n"
             )
