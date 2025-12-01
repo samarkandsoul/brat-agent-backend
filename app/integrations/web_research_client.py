@@ -397,28 +397,41 @@ def format_news_intel(query: str, num_results: int = 5) -> str:
     """
     Xüsusi NEWS / INTEL formatı.
 
-    Yeni sadə versiya:
-      - 'today world news' kimi sorğunu təmizləyir:
-          → 'world news'
-      - 2 müxtəlif sorğu ilə cəhd edir:
-          1) latest {base_clean} news
-          2) {base_clean} news today
-      - Hər ikisi də alınmasa, sadəcə "No results found..." qaytarır.
+    Yeni versiya:
+      - 'today world news' → 'world news' kimi təmizləyir.
+      - 'news' sözü artıq içindədirsə, ikinci dəfə 'news news' yazmırıq.
+      - Yalnız etibarlı news saytları:
+          BBC, Reuters, AP, FT, Bloomberg, Al Jazeera
+      - 2 sorğu ilə cəhd edir:
+          1) latest {base_clean}
+          2) {base_clean} today
     """
     raw = (query or "").strip()
     if not raw:
         raw = "world news"
 
-    # Aşağı hərflərə salıb "today" sözünü çıxarırıq ki, "today world news" -> "world news" olsun
     lowered = raw.lower()
-    base_clean = lowered.replace("today", "").strip()
-    if not base_clean:
-        base_clean = "world news"
+    # "today" sözünü atırıq ki, baz sorğu təmiz olsun
+    lowered = lowered.replace("today", "").strip()
+    if not lowered:
+        lowered = "world news"
 
-    display_base = base_clean  # istifadəçiyə göstərilən hissə
+    base_clean = lowered
+    display_base = base_clean
 
-    q1 = f"latest {base_clean} news"
-    q2 = f"{base_clean} news today"
+    # Əlavə news sayt filtri
+    news_sites = (
+        "site:bbc.com OR site:reuters.com OR site:apnews.com "
+        "OR site:ft.com OR site:bloomberg.com OR site:aljazeera.com"
+    )
+
+    # "news" artıq içindədirsə, yenidən "news" əlavə etmirik
+    if "news" in base_clean:
+        q1 = f"latest {base_clean} {news_sites}"
+        q2 = f"{base_clean} today {news_sites}"
+    else:
+        q1 = f"latest {base_clean} news {news_sites}"
+        q2 = f"{base_clean} news today {news_sites}"
 
     results: List[Tuple[str, str]] = []
 
