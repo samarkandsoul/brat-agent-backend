@@ -758,7 +758,7 @@ class MSP:
                 lines.append(f"Notes: {extra_notes}")
             lines.append("")
 
-            # ---- DS-01: Market research ----
+            # ---- DS-01: Market research (short preview) ----
             try:
                 from app.agents.ds.ds01_market_research import (
                     analyze_market,
@@ -767,17 +767,17 @@ class MSP:
 
                 mr_req = MarketResearchRequest(niche=niche, country=country)
                 mr_result = analyze_market(mr_req)
-                mr_preview = (mr_result or "")[:1500]
-                lines.append("📊 *DS-01 — Market Research (preview)*")
+                mr_preview = (mr_result or "")[:700]
+                lines.append("📊 *DS-01 — Market Research (short preview)*")
                 lines.append(mr_preview)
                 if mr_result and len(mr_result) > len(mr_preview):
-                    lines.append("... (truncated, full report via msp: market: ...)")
+                    lines.append("... (truncated, full report with `msp: market: ...`)")
                 lines.append("")
             except Exception as e:  # pylint: disable-broad-except
                 lines.append(f"❌ DS-01 Market Research failed: {e}")
                 lines.append("")
 
-            # ---- DS-21: Product auto creator ----
+            # ---- DS-21: Product auto creator (short) ----
             try:
                 from app.agents.ds.ds21_product_auto_creator import (
                     ProductAutoCreator,
@@ -792,14 +792,15 @@ class MSP:
                     extra_info=f"Target customer: {target_customer}",
                 )
                 product_block = creator.create_full_product(idea)
-                lines.append("🧪 *DS-21 — Product concept*")
-                lines.append(product_block)
+                product_preview = (product_block or "")[:700]
+                lines.append("🧪 *DS-21 — Product concept (preview)*")
+                lines.append(product_preview)
                 lines.append("")
             except Exception as e:  # pylint: disable-broad-except
                 lines.append(f"❌ DS-21 ProductAutoCreator failed: {e}")
                 lines.append("")
 
-            # ---- DS-22: Image auto agent ----
+            # ---- DS-22: Image auto agent (short) ----
             try:
                 from app.agents.ds.ds22_image_auto_agent import (
                     ImageAutoAgent,
@@ -814,14 +815,15 @@ class MSP:
                     extra_info=f"Target customer: {target_customer}",
                 )
                 image_plan = img_agent.generate_image_plan(img_idea)
-                lines.append("🖼 *DS-22 — Image & creative plan*")
-                lines.append(image_plan)
+                image_preview = (image_plan or "")[:700]
+                lines.append("🖼 *DS-22 — Image & creative plan (preview)*")
+                lines.append(image_preview)
                 lines.append("")
             except Exception as e:  # pylint: disable-broad-except
                 lines.append(f"❌ DS-22 ImageAutoAgent failed: {e}")
                 lines.append("")
 
-            # ---- DS-05: Product page copy ----
+            # ---- DS-05: Product page copy (short) ----
             try:
                 from app.agents.ds.ds05_product_page_copywriter import (
                     generate_product_page_copy_from_text,
@@ -832,8 +834,9 @@ class MSP:
                     f"{target_customer} | main benefit: solve their key pain quickly | {extra_notes}"
                 )
                 copy_block = generate_product_page_copy_from_text(copy_brief)
-                lines.append("📝 *DS-05 — Product page copy (draft)*")
-                lines.append(copy_block)
+                copy_preview = (copy_block or "")[:700]
+                lines.append("📝 *DS-05 — Product page copy (preview)*")
+                lines.append(copy_preview)
                 lines.append("")
             except Exception as e:  # pylint: disable-broad-except
                 lines.append(f"❌ DS-05 Product Page Copywriter failed: {e}")
@@ -847,10 +850,16 @@ class MSP:
                 "  4) Push to Shopify via DS03 agent (msp: shopify: ...).\n"
             )
 
-            return "\n".join(lines)
+            text_out = "\n".join(lines)
+
+            # Telegram 4096 char limiti üçün safety cut
+            if len(text_out) > 3800:
+                text_out = text_out[:3800] + "\n\n...(trimmed for Telegram limit)"
+
+            return text_out
 
         # ==========================================================
-        # 3.8) DS-21 PRODUCT AUTO CREATOR
+        # 3.9) DS-21 PRODUCT AUTO CREATOR
         # ==========================================================
         if lowered.startswith("product:") or lowered.startswith("ds21:"):
             if lowered.startswith("product:"):
@@ -900,7 +909,7 @@ class MSP:
                 return f"MSP error: DS-21 processing error: {e}"
 
         # ==========================================================
-        # 3.9) DS-22 IMAGE AUTO AGENT
+        # 3.10) DS-22 IMAGE AUTO AGENT
         # ==========================================================
         if lowered.startswith("image:") or lowered.startswith("ds22:"):
             if lowered.startswith("image:"):
@@ -950,7 +959,7 @@ class MSP:
                 return f"MSP error: DS-22 processing error: {e}"
 
         # ==========================================================
-        # 3.6) DS-05 PRODUCT PAGE COPYWRITER
+        # 3.11) DS-05 PRODUCT PAGE COPYWRITER
         # ==========================================================
         if lowered.startswith("ds05:"):
             body = text[len("ds05:"):].strip()
@@ -974,7 +983,7 @@ class MSP:
                 return f"MSP error: DS-05 processing error: {e}"
 
         # ==========================================================
-        # 3.7) GPT / MAMOS-aware General Chat
+        # 3.12) GPT / MAMOS-aware General Chat
         # ==========================================================
         if lowered.startswith("gpt:") or lowered.startswith("chat:"):
             if lowered.startswith("gpt:"):
@@ -1069,4 +1078,4 @@ class MSP:
             "  • msp: launch: pet hair remover | US | women 25–45 with pets | 24.90 | TikTok-friendly, impulse buy\n"
             "  • msp: gpt: Explain the Samarkand Soul brand in 3 sentences\n"
             "  • msp: tga: start  (TikTok Growth Agent daily cycle)\n"
-            )
+)
