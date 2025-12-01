@@ -7,7 +7,8 @@ from typing import List
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from app.integrations.web_research_client import format_search_results
+# ⬇️ ARTIQ burdan oxuyuruq (API-keysiz free search engine)
+from app.integrations.web_free_search import free_format_results
 
 
 class IntelSearchRequest(BaseModel):
@@ -26,7 +27,7 @@ class WebCoreAgent:
     WEB-CORE-01 – Intel beyni.
 
     Öz-özünə internetə çıxmır; bütün web axtarışını
-    `web_research_client.format_search_results` üzərindən edir.
+    `web_free_search.free_format_results` üzərindən edir.
     """
 
     def handle_query(self, req: IntelSearchRequest) -> str:
@@ -35,8 +36,8 @@ class WebCoreAgent:
             return "WEB-CORE-01 error: sorğu (query) boş ola bilməz."
 
         try:
-            # Burada artıq real web/search inteqrasiyası işləyir
-            raw_answer = format_search_results(req.query)
+            # Burada artıq API-keysiz free web/search inteqrasiyası işləyir
+            raw_answer = free_format_results(req.query, limit=5)
         except Exception as e:  # noqa: BLE001
             return (
                 "WEB-CORE-01 hazırdır, amma real web axtarışında problem yarandı.\n"
