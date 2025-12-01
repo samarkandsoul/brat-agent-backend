@@ -14,6 +14,9 @@ from app.mamos.MAMOS.mamos_loader import MAMOSLoader
 # Brat GPT – unified LLM interface (MAMOS-aware)
 from app.llm.brat_gpt import brat_gpt_chat
 
+# WEB-CORE-01 – Intel / web search agent
+from app.intel.web_core import WebCoreAgent, IntelSearchRequest
+
 
 class MSP:
     """
@@ -162,6 +165,39 @@ class MSP:
 
             preview = doc[:3500]
             return "📜 MAMOS — Samarkand Soul Doctrine (preview):\n\n" + preview
+
+        # ==========================================================
+        # 0.3) INTEL / WEB-CORE-01 — central web search brain
+        # ==========================================================
+        if lowered.startswith("intel:") or lowered.startswith("news:"):
+            # msp: intel: today world news
+            # msp: news: ecommerce trends for tablecloth niche
+            if lowered.startswith("intel:"):
+                body = text[len("intel:"):].strip()
+            else:
+                body = text[len("news:"):].strip()
+
+            if not body:
+                return (
+                    "Intel agent commands:\n"
+                    "  • msp: intel: today world news\n"
+                    "  • msp: news: ecommerce trends for tablecloth niche\n"
+                )
+
+            # Tag-lar – sadə variant
+            tags: List[str] = ["INTEL"]
+            if "news" in body.lower() or lowered.startswith("news:"):
+                tags.append("NEWS")
+
+            req = IntelSearchRequest(query=body, tags=tags)
+            agent = WebCoreAgent()
+
+            try:
+                # WebCoreAgent artıq sənin üçün web search edib
+                # formatlanmış mətn qaytarır
+                return agent.handle_query(req)
+            except Exception as e:  # noqa: BLE001
+                return f"MSP error: WEB-CORE-01 routing failed: {e}"
 
         # ==========================================================
         # 0.5) DAILY REPORT AGENT (sales + life + system)
@@ -484,7 +520,7 @@ class MSP:
             )
 
         # ==========================================================
-        # 3.55) WEB RESEARCH AGENT — Internet access
+        # 3.55) WEB RESEARCH AGENT — Internet access (low-level)
         # ==========================================================
         if lowered.startswith("web:"):
             raw_body = text[len("web:"):].strip()
@@ -681,64 +717,6 @@ class MSP:
                 "  • msp: calendar: upcoming | 5\n"
                 "  • msp: cal: today | 10\n"
             )
-
-        # ==========================================================
-        # 3.58) INTEL / WEB-CORE-01 — central web search brain
-        # ==========================================================
-        if lowered.startswith("intel:") or lowered.startswith("news:"):
-            if lowered.startswith("intel:"):
-                body = text[len("intel:"):].strip()
-            else:
-                body = text[len("news:"):].strip()
-
-            if not body:
-                return (
-                    "Intel agent commands:\n"
-                    "  • msp: intel: today world news\n"
-                    "  • msp: news: ecommerce trends for tablecloth niche\n"
-                )
-
-            try:
-                from app.intel.web_core import WebCoreAgent, IntelSearchRequest
-            except Exception as e:  # pylint: disable-broad-except
-                return f"MSP error: WEB-CORE-01 import failed: {e}"
-
-            agent = WebCoreAgent()
-            req = IntelSearchRequest(
-                query=body,
-                intent_tags=["INTEL", "NEWS"],
-            )
-
-            try:
-                result = agent.route(req)
-            except Exception as e:  # pylint: disable-broad-except
-                return f"MSP error: WEB-CORE-01 routing failed: {e}"
-
-            lines: List[str] = []
-            lines.append("🛰 *WEB-CORE-01 — Intel summary*")
-            lines.append("")
-            lines.append(result.summary)
-            lines.append("")
-
-            if result.bullets:
-                for b in result.bullets:
-                    lines.append(f"- {b}")
-                lines.append("")
-
-            if result.action_items:
-                lines.append("Next steps:")
-                for a in result.action_items:
-                    lines.append(f"  • {a}")
-                lines.append("")
-
-            if result.sources:
-                lines.append("Sources:")
-                for s in result.sources[:3]:
-                    title = s.title or s.url
-                    provider = f" [{s.provider}]" if s.provider else ""
-                    lines.append(f"  • {title}{provider}")
-
-            return "\n".join(lines)
 
         # ==========================================================
         # 3.8) DS-21 PRODUCT AUTO CREATOR
@@ -959,4 +937,4 @@ class MSP:
             "  • msp: news: ecommerce trends for tablecloth niche\n"
             "  • msp: gpt: Explain the Samarkand Soul brand in 3 sentences\n"
             "  • msp: tga: start  (TikTok Growth Agent daily cycle)\n"
-            )
+        )
