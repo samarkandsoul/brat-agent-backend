@@ -20,6 +20,11 @@ from app.reports.morning_plan_service import (
 )
 from app.integrations.telegram_client import handle_telegram_update
 
+# ======================================
+# INTEL ROUTER IMPORT (YENİ ƏLAVƏ)
+# ======================================
+from app.intel.web_core import router as intel_router
+
 app = FastAPI(title="BRAT Backend")
 
 
@@ -177,3 +182,9 @@ def telegram_webhook(update: Dict[str, Any]):
     except Exception as e:  # noqa: BLE001
         print("Telegram webhook error:", e)
         return {"ok": False, "error": str(e)}
+
+
+# ======================================
+# INTEL ROUTER REGISTRATION (YENİ)
+# ======================================
+app.include_router(intel_router)
