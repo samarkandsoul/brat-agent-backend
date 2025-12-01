@@ -89,11 +89,23 @@ class MSP:
     @staticmethod
     def _strip_msp_prefix(raw_text: str) -> str:
         """
-        Remove 'msp:' prefix and trim whitespace.
+        Remove 'msp:' prefix (with or without spaces) and trim whitespace.
+
+        Qəbul edir:
+          - 'msp: status'
+          - 'msp : status'
+          - 'MSP: status'
+          - 'MSP   :   status'
         """
         text = (raw_text or "").strip()
-        if text.lower().startswith("msp:"):
-            return text[4:].strip()
+        lower = text.lower()
+
+        if lower.startswith("msp"):
+            colon_index = lower.find(":")
+            if colon_index != -1:
+                # ':'-dan sonrakı hissəni götürürük
+                return text[colon_index + 1 :].strip()
+
         return text
 
     @staticmethod
@@ -353,7 +365,9 @@ class MSP:
                     generate_product_page_copy_from_text,
                 )
 
-                lines.append("• DS-LAUNCH-01 pipeline: ✅ DS-01 / DS-21 / DS-22 / DS-05 online")
+                lines.append(
+                    "• DS-LAUNCH-01 pipeline: ✅ DS-01 / DS-21 / DS-22 / DS-05 online"
+                )
             except Exception as e:  # noqa: BLE001
                 lines.append(f"• DS-LAUNCH-01 pipeline: ⚠️ import error — {e}")
 
