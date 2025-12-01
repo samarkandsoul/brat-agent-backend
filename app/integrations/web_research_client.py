@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import List, Tuple, Literal, Dict, Any
+from typing import List, Tuple, Literal, Optional, Dict, Any
 
 import requests
 from bs4 import BeautifulSoup  # HTML parsing for fallback search
@@ -16,9 +16,10 @@ DEFAULT_HEADERS = {
 }
 
 # gələcəkdə ZENSERP, BRIGHTDATA və s. əlavə edə bilərik
-SearchProvider = Literal["NONE", "SERPAPI", "SERPER", "DUCKDUCKGO_HTML"]
+SearchProvider = Literal["NONE", "SERPAPI", "SERPER", "BING_HTML", "DUCKDUCKGO_HTML"]
 
-SEARCH_PROVIDER: SearchProvider = os.getenv("SEARCH_PROVIDER", "NONE").upper()  # "NONE" default
+# default-u NONE saxlayırıq, özümüz BING_HTML fallback edirik
+SEARCH_PROVIDER: SearchProvider = os.getenv("SEARCH_PROVIDER", "NONE").upper()
 SERPAPI_KEY = os.getenv("SERPAPI_API_KEY")
 SERPER_KEY = os.getenv("SERPER_API_KEY")  # əgər Serper.dev istifadə etsən
 
@@ -78,8 +79,8 @@ def search_web(query: str, num_results: int = 5) -> List[Tuple[str, str]]:
     Returns list of (title, url).
 
     Strategy:
-    - If SEARCH_PROVIDER explicitly set to SERPAPI/SERPER and key is present -> use that.
-    - Else -> fallback to DuckDuckGo HTML scraping backend (no API key, no phone).
+    - Əgər SERPAPI/SERPER və key varsa → onları işlət.
+    - Yoxdursa → əvvəl BING HTML (API keysiz), sonra DuckDuckGo HTML fallback.
     """
     provider = SEARCH_PROVIDER
 
@@ -87,20 +88,27 @@ def search_web(query: str, num_results: int = 5) -> List[Tuple[str, str]]:
     if provider == "SERPAPI":
         if not SERPAPI_KEY:
             # fallback if misconfigured
-            return _search_with_duckduckgo_html(query, num_results)
+            return _search_with_bing_html(query, num_results)
         return _search_with_serpapi(query, num_results)
 
     if provider == "SERPER":
         if not SERPER_KEY:
             # fallback if misconfigured
-            return _search_with_duckduckgo_html(query, num_results)
+            return _search_with_bing_html(query, num_results)
         return _search_with_serper(query, num_results)
+
+    if provider == "BING_HTML":
+        return _search_with_bing_html(query, num_results)
 
     if provider == "DUCKDUCKGO_HTML":
         return _search_with_duckduckgo_html(query, num_results)
 
-    # provider == "NONE" or unknown -> safe fallback
-    return _search_with_duckduckgo_html(query, num_results)
+    # provider == "NONE" or unknown -> safe fallback chain
+    try:
+        return _search_with_bing_html(query, num_results)
+    except WebResearchError:
+        # əgər Bing HTML də bloklanıbsa, DuckDuckGo-nu da cəhd edək
+        return _search_with_duckduckgo_html(query, num_results)
 
 
 # -----------------------------
@@ -110,13 +118,11 @@ def search_web(query: str, num_results: int = 5) -> List[Tuple[str, str]]:
 def _search_with_serpapi(query: str, num_results: int) -> List[Tuple[str, str]]:
     """
     Legacy SerpAPI integration.
-    Currently disabled because of regional restrictions.
+    Hazırda region limitlərinə görə disabled.
     """
     if not SERPAPI_KEY:
         raise WebResearchError("SERPAPI_API_KEY is not set.")
 
-    # Burada səndə olan köhnə SerpApi kodun qalsın – amma artıq məcburi deyil
-    # Sadə placeholder:
     raise WebResearchError("SerpApi currently disabled due to region restrictions.")
 
 
@@ -155,10 +161,54 @@ def _search_with_serper(query: str, num_results: int) -> List[Tuple[str, str]]:
     return results
 
 
+def _search_with_bing_html(query: str, num_results: int) -> List[Tuple[str, str]]:
+    """
+    Free HTML-based search via Bing (no API key, no phone).
+
+    Returns list of (title, url).
+    """
+    search_url = "https://www.bing.com/search"
+    params = {"q": query, "setlang": "en"}
+
+    try:
+        resp = requests.get(
+            search_url,
+            params=params,
+            headers=DEFAULT_HEADERS,
+            timeout=DEFAULT_TIMEOUT,
+        )
+        resp.raise_for_status()
+    except Exception as e:
+        raise WebResearchError(f"Bing request failed: {e}") from e
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+
+    results: List[Tuple[str, str]] = []
+
+    # Klassik Bing layout: li.b_algo h2 a
+    for li in soup.select("li.b_algo"):
+        a = li.select_one("h2 a")
+        if not a:
+            continue
+        title = a.get_text(strip=True)
+        link = a.get("href")
+        if not title or not link:
+            continue
+
+        results.append((title, link))
+        if len(results) >= num_results:
+            break
+
+    if not results:
+        raise WebResearchError("Bing HTML returned no results or layout changed.")
+
+    return results
+
+
 def _search_with_duckduckgo_html(query: str, num_results: int) -> List[Tuple[str, str]]:
     """
     Fallback search provider using DuckDuckGo's HTML interface.
-    No API key, no phone, just plain HTTP + HTML parsing.
+    No API key, no phone, sadəcə HTTP + HTML parsing.
 
     Returns list of (title, url).
     """
@@ -177,32 +227,24 @@ def _search_with_duckduckgo_html(query: str, num_results: int) -> List[Tuple[str
         )
         resp.raise_for_status()
     except Exception as e:
-        # DDG çox vaxt server-ləri bloklayır – bu normaldır.
         raise WebResearchError(f"DuckDuckGo request failed: {e}") from e
 
     soup = BeautifulSoup(resp.text, "html.parser")
 
     results: List[Tuple[str, str]] = []
-    # DuckDuckGo HTML results usually use 'result__a' class for titles
+
+    # Köhnə layout: a.result__a
     for a in soup.select("a.result__a"):
         title = a.get_text(strip=True)
         link = a.get("href")
         if not link or not title:
             continue
-
-        # DuckDuckGo sometimes returns redirect URLs; keep as-is for now
         results.append((title, link))
-
         if len(results) >= num_results:
             break
 
-    # Əgər layout dəyişibsə və ya heç nəticə çıxmırsa – error verək, yuxarıda
-    # format_search_results bunu yumşaq, insan-kimi mətndə göstərəcək.
     if not results:
-        raise WebResearchError(
-            "DuckDuckGo HTML did not return any parseable results "
-            "(layout changed or access blocked from server)."
-        )
+        raise WebResearchError("DuckDuckGo HTML returned no results or layout changed.")
 
     return results
 
@@ -222,29 +264,16 @@ def format_search_results(query: str, num_results: int = 5) -> str:
     Output:
         Telegram/Markdown üçün səliqəli mətn.
     """
+    if not query:
+        return "WEB search error: query boş ola bilməz."
+
     try:
         results = search_web(query, num_results=num_results)
     except WebResearchError as e:
-        # Dev/demo-friendly cavab – çılpaq error əvəzinə izah + guidance
-        return (
-            "🌐 *WEB-CORE-01 — dev/demo mode*\n\n"
-            f"Sorğu: `{query}`\n\n"
-            "Hazırda backend serverdən real web axtarış provider-lərinə (DuckDuckGo / Google API) "
-            "çıxış məhdud ola bilər. Ona görə canlı nəticə gətirə bilmədim.\n\n"
-            "Yaxşı xəbər: WEB-CORE-01 strukturu və MSP router tam işləyir. "
-            "Sonrakı mərhələdə:\n"
-            "  • SEARCH_PROVIDER üçün real API (SERPER və s.) açarı əlavə edəcəyik\n"
-            "  • və ya Render serverində web access üçün ayrıca provider seçəcəyik.\n\n"
-            f"Texniki səbəb:\n`{e}`"
-        )
+        return f"No results found for {query}.\n(Provider error: {e})"
 
     if not results:
-        # Bu branch əslində yuxarıdakı except-dən əvvəl çox az hallarda gələr,
-        # amma yenə də insan-kimi cavab verək.
-        return (
-            f"🌐 WEB-CORE-01: `{query}` üçün nəticə tapılmadı.\n"
-            "Bu daha çox serverdən search provider-ə çıxışın məhdud olması ilə bağlı ola bilər."
-        )
+        return f"No results found for {query}."
 
     lines: List[str] = [
         f"🔎 *Web Search results for:* `{query}`",
@@ -252,7 +281,6 @@ def format_search_results(query: str, num_results: int = 5) -> str:
     ]
 
     for idx, (title, url) in enumerate(results, start=1):
-        # Sadə və sabit Markdown formatı
         lines.append(f"{idx}. *{title}*\n   {url}")
 
     lines.append(
