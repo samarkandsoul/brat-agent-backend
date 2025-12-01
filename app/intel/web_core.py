@@ -6,6 +6,7 @@ from fastapi import APIRouter
 # 1. Pydantic data modelləri
 # ===========================
 
+
 class IntelSource(BaseModel):
     url: str
     title: Optional[str] = None
@@ -17,7 +18,10 @@ class IntelSearchRequest(BaseModel):
     query: str = Field(..., description="Bratın sorğusu")
     intent_tags: List[str] = Field(
         default_factory=list,
-        description="MSP Router-dən gələn intent tag-lar, məsələn: INTEL, NEWS, WEB, PRODUCT_SPY"
+        description=(
+            "MSP Router-dən gələn intent tag-lar, məsələn: "
+            "INTEL, NEWS, WEB, PRODUCT_SPY"
+        ),
     )
     # gələcəkdə: language, country, time_range və s. əlavə edə bilərik
 
@@ -35,6 +39,7 @@ class IntelSearchResponse(BaseModel):
 # 2. WEB-CORE-01 Agent class
 # ===========================
 
+
 class WebCoreAgent:
     """
     WEB-CORE-01 — Central WebSearch Brain
@@ -46,14 +51,13 @@ class WebCoreAgent:
     İndi skeleton: hələ real API çağırmır, sadəcə struktur hazırdır.
     """
 
-    async def route(self, req: IntelSearchRequest) -> IntelSearchResponse:
-        # Sadə routing məntiqi: hələlik hamısını mock cavabla qaytarırıq
+    def route(self, req: IntelSearchRequest) -> IntelSearchResponse:
+        """
+        Hal-hazırda sync method – MSP-dən və FastAPI endpoint-dən rahat çağırılsın.
+        Gələcəkdə real web inteqrasiyası bu funksiya içində işə salınacaq.
+        """
         tags = [t.upper() for t in req.intent_tags]
 
-        # Gələcəkdə burda real seçim olacaq:
-        # if "PRODUCT_SPY" in tags: self._call_search_api(...)
-        # elif "NEWS" in tags: self._call_openai_browser(...)
-        # indi isə: dummy cavab
         summary = (
             "WEB-CORE-01 hazırdır, amma hələ demo rejimdədir. "
             "Sorğunu qəbul etdi və sənə strukturlaşdırılmış cavab qaytardı."
@@ -67,7 +71,7 @@ class WebCoreAgent:
 
         action_items = [
             "MSP Router-də INTEL/NEWS/WEB tipli sorğuları WEB-CORE-01-ə yönləndir.",
-            "Sonra OpenAI browser və ya search API inteqrasiyasını bu class-ın içində aktiv et."
+            "Sonra OpenAI browser və ya search API inteqrasiyasını bu class-ın içində aktiv et.",
         ]
 
         sources = [
@@ -110,19 +114,20 @@ router = APIRouter(prefix="/intel", tags=["intel"])
 
 
 @router.post("/search", response_model=IntelSearchResponse)
-async def intel_search_endpoint(payload: IntelSearchRequest) -> IntelSearchResponse:
+def intel_search_endpoint(payload: IntelSearchRequest) -> IntelSearchResponse:
     """
     Ümumi INTEL / WEB search endpoint-i.
     MSP Router buraya sorğunu və intent tag-ları ötürür.
     """
     agent = WebCoreAgent()
-    result = await agent.route(payload)
+    result = agent.route(payload)
     return result
 
 
 # ===========================
 # 4. Helper (istəsən istifadə edərsən)
 # ===========================
+
 
 def get_web_core_agent() -> WebCoreAgent:
     """
