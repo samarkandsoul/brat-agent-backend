@@ -1,137 +1,71 @@
-from typing import List, Literal, Optional
-from pydantic import BaseModel, Field
+# app/intel/web_core.py
+
+from __future__ import annotations
+
+from typing import List
+
 from fastapi import APIRouter
+from pydantic import BaseModel
 
-# ===========================
-# 1. Pydantic data modelləri
-# ===========================
-
-
-class IntelSource(BaseModel):
-    url: str
-    title: Optional[str] = None
-    snippet: Optional[str] = None
-    provider: Optional[str] = None  # "openai_browser", "google_api" və s.
+# Bütün real web axtarış loqikası burada cəmlənir
+from app.integrations.web_research_client import format_search_results
 
 
 class IntelSearchRequest(BaseModel):
-    query: str = Field(..., description="Bratın sorğusu")
-    intent_tags: List[str] = Field(
-        default_factory=list,
-        description=(
-            "MSP Router-dən gələn intent tag-lar, məsələn: "
-            "INTEL, NEWS, WEB, PRODUCT_SPY"
-        ),
-    )
-    # gələcəkdə: language, country, time_range və s. əlavə edə bilərik
+    """
+    WEB-CORE-01 üçün əsas request modeli.
 
-
-class IntelSearchResponse(BaseModel):
-    summary: str
-    bullets: List[str] = Field(default_factory=list)
-    action_items: List[str] = Field(default_factory=list)
-    sources: List[IntelSource] = Field(default_factory=list)
-    used_channel: Optional[Literal["openai_browser", "search_api", "mock"]] = None
-    raw_data: Optional[dict] = None
-
-
-# ===========================
-# 2. WEB-CORE-01 Agent class
-# ===========================
+    - query: əsas sorğu mətni
+    - tags: INTEL, NEWS, ECOM və s. kimi əlavə etikətlər
+    """
+    query: str
+    tags: List[str] = []
 
 
 class WebCoreAgent:
     """
-    WEB-CORE-01 — Central WebSearch Brain
+    WEB-CORE-01 – Intel beyni.
 
-    HYBRID məntiq:
-      - sadə, ümumi suallar üçün: OpenAI browser / ReAct (gələcəkdə)
-      - xüsusi intel (rəqiblər, məhsullar və s.) üçün: search API (gələcəkdə)
-
-    İndi skeleton: hələ real API çağırmır, sadəcə struktur hazırdır.
+    Öz-özünə internetə çıxmır; bütün web axtarışını
+    `web_research_client.format_search_results` üzərindən edir.
     """
 
-    def route(self, req: IntelSearchRequest) -> IntelSearchResponse:
-        """
-        Hal-hazırda sync method – MSP-dən və FastAPI endpoint-dən rahat çağırılsın.
-        Gələcəkdə real web inteqrasiyası bu funksiya içində işə salınacaq.
-        """
-        tags = [t.upper() for t in req.intent_tags]
+    def handle_query(self, req: IntelSearchRequest) -> str:
+        # Sadə qoruma
+        if not req.query:
+            return "WEB-CORE-01 error: sorğu (query) boş ola bilməz."
 
-        summary = (
-            "WEB-CORE-01 hazırdır, amma hələ demo rejimdədir. "
-            "Sorğunu qəbul etdi və sənə strukturlaşdırılmış cavab qaytardı."
-        )
-
-        bullets = [
-            f"Sorğun: {req.query}",
-            f"Intent tag-lar: {', '.join(tags) if tags else 'heç biri verilməyib'}",
-            "Gələcək mərhələdə bu cavab real web nəticələrindən generasiya olunacaq.",
-        ]
-
-        action_items = [
-            "MSP Router-də INTEL/NEWS/WEB tipli sorğuları WEB-CORE-01-ə yönləndir.",
-            "Sonra OpenAI browser və ya search API inteqrasiyasını bu class-ın içində aktiv et.",
-        ]
-
-        sources = [
-            IntelSource(
-                url="https://samarkandsoul-intel.local/mock",
-                title="Mock intel source (dev mode)",
-                snippet="Bu, yalnız development mərhələsi üçün istifadə olunan test mənbədir.",
-                provider="mock",
+        try:
+            # Burada artıq real web/search inteqrasiyası işləyir
+            raw_answer = format_search_results(req.query)
+        except Exception as e:  # noqa: BLE001
+            return (
+                "WEB-CORE-01 hazırdır, amma real web axtarışında problem yarandı.\n"
+                f"Error: {e}"
             )
-        ]
 
-        return IntelSearchResponse(
-            summary=summary,
-            bullets=bullets,
-            action_items=action_items,
-            sources=sources,
-            used_channel="mock",
-            raw_data={"note": "Real web inteqrasiyası hələ qoşulmayıb."},
+        tag_line = ", ".join(req.tags) if req.tags else "none"
+
+        return (
+            "🧠 WEB-CORE-01 — Intel summary\n\n"
+            f"• Sorğu: {req.query}\n"
+            f"• Taglar: {tag_line}\n\n"
+            f"{raw_answer}"
         )
 
-    # Gələcəkdə burda real funksiyalar olacaq
-    async def _call_openai_browser(self, req: IntelSearchRequest) -> IntelSearchResponse:
-        """
-        TODO: OpenAI ReAct + Browser tool inteqrasiyası bura gələcək.
-        """
-        raise NotImplementedError
 
-    async def _call_search_api(self, req: IntelSearchRequest) -> IntelSearchResponse:
-        """
-        TODO: Google / SerpAPI və s. web search API çağırışları bura gələcək.
-        """
-        raise NotImplementedError
-
-
-# ===========================
-# 3. FastAPI router
-# ===========================
-
+# =========================
+#  FastAPI router
+# =========================
 router = APIRouter(prefix="/intel", tags=["intel"])
 
 
-@router.post("/search", response_model=IntelSearchResponse)
-def intel_search_endpoint(payload: IntelSearchRequest) -> IntelSearchResponse:
+@router.post("/search")
+def intel_search(req: IntelSearchRequest):
     """
-    Ümumi INTEL / WEB search endpoint-i.
-    MSP Router buraya sorğunu və intent tag-ları ötürür.
+    HTTP endpoint (Render, Postman və s. üçün).
+    Telegram MSP də eyni WebCoreAgent-i istifadə edir.
     """
     agent = WebCoreAgent()
-    result = agent.route(payload)
-    return result
-
-
-# ===========================
-# 4. Helper (istəsən istifadə edərsən)
-# ===========================
-
-
-def get_web_core_agent() -> WebCoreAgent:
-    """
-    Dependency injection üçün helper.
-    Gələcəkdə burada cache / shared state saxlaya bilərsən.
-    """
-    return WebCoreAgent()
+    answer = agent.handle_query(req)
+    return {"status": "ok", "answer": answer}
