@@ -1,8 +1,9 @@
+# app/integrations/web_research_client.py
 from __future__ import annotations
 
 import os
 import re
-from typing import List, Tuple, Literal, Optional, Dict, Any
+from typing import List, Tuple, Literal, Dict, Any
 
 import requests
 from bs4 import BeautifulSoup  # HTML parsing for fallback search
@@ -169,12 +170,7 @@ def _search_with_duckduckgo_html(query: str, num_results: int) -> List[Tuple[str
     }
 
     try:
-        resp = requests.get(
-            search_url,
-            params=params,
-            headers=DEFAULT_HEADERS,
-            timeout=DEFAULT_TIMEOUT,
-        )
+        resp = requests.get(search_url, params=params, headers=DEFAULT_HEADERS, timeout=DEFAULT_TIMEOUT)
         resp.raise_for_status()
     except Exception as e:
         raise WebResearchError(f"DuckDuckGo request failed: {e}") from e
@@ -195,11 +191,8 @@ def _search_with_duckduckgo_html(query: str, num_results: int) -> List[Tuple[str
         if len(results) >= num_results:
             break
 
-    # 🔧 DƏYİŞİKLİK BURADADIR
     if not results:
-        # Layout dəyişibsə və ya nəticə gəlmirsə – error atmaq əvəzinə boş list.
-        # Yuxarıdakı format_search_results() bunu "nəticə tapılmadı" kimi göstərəcək.
-        return []
+        raise WebResearchError("DuckDuckGo HTML returned no results or layout changed.")
 
     return results
 
