@@ -1,4 +1,3 @@
-# app/integrations/web_research_client.py
 from __future__ import annotations
 
 import os
@@ -170,9 +169,15 @@ def _search_with_duckduckgo_html(query: str, num_results: int) -> List[Tuple[str
     }
 
     try:
-        resp = requests.get(search_url, params=params, headers=DEFAULT_HEADERS, timeout=DEFAULT_TIMEOUT)
+        resp = requests.get(
+            search_url,
+            params=params,
+            headers=DEFAULT_HEADERS,
+            timeout=DEFAULT_TIMEOUT,
+        )
         resp.raise_for_status()
     except Exception as e:
+        # DDG çox vaxt server-ləri bloklayır – bu normaldır.
         raise WebResearchError(f"DuckDuckGo request failed: {e}") from e
 
     soup = BeautifulSoup(resp.text, "html.parser")
@@ -191,8 +196,13 @@ def _search_with_duckduckgo_html(query: str, num_results: int) -> List[Tuple[str
         if len(results) >= num_results:
             break
 
+    # Əgər layout dəyişibsə və ya heç nəticə çıxmırsa – error verək, yuxarıda
+    # format_search_results bunu yumşaq, insan-kimi mətndə göstərəcək.
     if not results:
-        raise WebResearchError("DuckDuckGo HTML returned no results or layout changed.")
+        raise WebResearchError(
+            "DuckDuckGo HTML did not return any parseable results "
+            "(layout changed or access blocked from server)."
+        )
 
     return results
 
@@ -215,10 +225,26 @@ def format_search_results(query: str, num_results: int = 5) -> str:
     try:
         results = search_web(query, num_results=num_results)
     except WebResearchError as e:
-        return f"WEB search error: {e}"
+        # Dev/demo-friendly cavab – çılpaq error əvəzinə izah + guidance
+        return (
+            "🌐 *WEB-CORE-01 — dev/demo mode*\n\n"
+            f"Sorğu: `{query}`\n\n"
+            "Hazırda backend serverdən real web axtarış provider-lərinə (DuckDuckGo / Google API) "
+            "çıxış məhdud ola bilər. Ona görə canlı nəticə gətirə bilmədim.\n\n"
+            "Yaxşı xəbər: WEB-CORE-01 strukturu və MSP router tam işləyir. "
+            "Sonrakı mərhələdə:\n"
+            "  • SEARCH_PROVIDER üçün real API (SERPER və s.) açarı əlavə edəcəyik\n"
+            "  • və ya Render serverində web access üçün ayrıca provider seçəcəyik.\n\n"
+            f"Texniki səbəb:\n`{e}`"
+        )
 
     if not results:
-        return f"WEB search: `{query}` üçün nəticə tapılmadı."
+        # Bu branch əslində yuxarıdakı except-dən əvvəl çox az hallarda gələr,
+        # amma yenə də insan-kimi cavab verək.
+        return (
+            f"🌐 WEB-CORE-01: `{query}` üçün nəticə tapılmadı.\n"
+            "Bu daha çox serverdən search provider-ə çıxışın məhdud olması ilə bağlı ola bilər."
+        )
 
     lines: List[str] = [
         f"🔎 *Web Search results for:* `{query}`",
