@@ -316,13 +316,15 @@ class MSP:
                     f"• Shopify agent (DS03): ❌ import/connection error — {e}"
                 )
 
-            # WEB-CORE-01 / Intel + web_research_client
+            # WEB-CORE-01 / Intel + free web search
             try:
-                from app.intel.web_core import WebCoreAgent
-                from app.integrations.web_research_client import format_search_results
+                from app.intel.web_core import WebCoreAgent  # noqa:F401
+                from app.integrations.web_free_search import (  # noqa:F401
+                    free_format_results,
+                )
 
                 _ = WebCoreAgent()
-                _ = format_search_results
+                _ = free_format_results
                 lines.append("• WEB-CORE-01 / intel: ✅ modules available")
             except Exception as e:  # noqa: BLE001
                 lines.append(f"• WEB-CORE-01 / intel: ❌ {e}")
@@ -1180,6 +1182,7 @@ class MSP:
         return (
             "MSP error: I did not recognize this MSP command.\n"
             "Possible examples:\n"
+            "  • msp: status\n"
             "  • msp: mamos\n"
             "  • msp: market: pet hair remover | US\n"
             "  • msp: offer: ideal pricing and bundle ideas for pet hair remover | US market\n"
