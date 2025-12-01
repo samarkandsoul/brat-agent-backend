@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import List
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # Bütün real web axtarış loqikası burada cəmlənir
 from app.integrations.web_research_client import format_search_results
@@ -19,7 +19,8 @@ class IntelSearchRequest(BaseModel):
     - tags: INTEL, NEWS, ECOM və s. kimi əlavə etikətlər
     """
     query: str
-    tags: List[str] = []
+    # mutable default problemi olmasın deyə Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list)
 
 
 class WebCoreAgent:
@@ -29,6 +30,11 @@ class WebCoreAgent:
     Öz-özünə internetə çıxmır; bütün web axtarışını
     `web_research_client.format_search_results` üzərindən edir.
     """
+
+    # 🔥 MSP burada .route oxuyur – MÜTLƏQDİR
+    id = "WEB-CORE-01"
+    route = "/intel/search"
+    description = "WEB-CORE-01 — web intel & news agent"
 
     def handle_query(self, req: IntelSearchRequest) -> str:
         # Sadə qoruma
