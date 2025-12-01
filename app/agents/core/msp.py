@@ -253,6 +253,121 @@ class MSP:
             )
 
         # ==========================================================
+        # 0.7) STATUS – commander system health snapshot
+        # ==========================================================
+        if lowered.startswith("status"):
+            lines: List[str] = []
+            lines.append("🩺 *Samarkand Soul System Status*")
+            lines.append("")
+
+            # MAMOS doctrine
+            try:
+                doc = self.load_mamos()
+                if isinstance(doc, str) and doc.startswith("[MAMOS ERROR]"):
+                    lines.append("• MAMOS doctrine: ⚠️ loaded with error marker")
+                else:
+                    lines.append("• MAMOS doctrine: ✅ loaded")
+            except Exception as e:  # noqa: BLE001
+                lines.append(f"• MAMOS doctrine: ❌ error — {e}")
+
+            # Daily report agent
+            try:
+                from app.reports.daily_report_service import build_daily_report
+
+                build_daily_report()
+                lines.append("• Daily report agent: ✅ online")
+            except Exception as e:  # noqa: BLE001
+                lines.append(f"• Daily report agent: ❌ {e}")
+
+            # Morning plan agent
+            try:
+                from app.reports.morning_plan_service import build_morning_plan
+
+                build_morning_plan()
+                lines.append("• Morning plan agent: ✅ online")
+            except Exception as e:  # noqa: BLE001
+                lines.append(f"• Morning plan agent: ❌ {e}")
+
+            # Shopify agent (DS03)
+            try:
+                from app.integrations.shopify_client import test_shopify_connection
+
+                res = test_shopify_connection()
+                if isinstance(res, str) and "error" in res.lower():
+                    lines.append(
+                        f"• Shopify agent (DS03): ⚠️ responded with error — {res}"
+                    )
+                else:
+                    lines.append("• Shopify agent (DS03): ✅ reachable")
+            except Exception as e:  # noqa: BLE001
+                lines.append(
+                    f"• Shopify agent (DS03): ❌ import/connection error — {e}"
+                )
+
+            # WEB-CORE-01 / Intel + web_research_client
+            try:
+                from app.intel.web_core import WebCoreAgent
+                from app.integrations.web_research_client import format_search_results
+
+                _ = WebCoreAgent()
+                _ = format_search_results
+                lines.append("• WEB-CORE-01 / intel: ✅ modules available")
+            except Exception as e:  # noqa: BLE001
+                lines.append(f"• WEB-CORE-01 / intel: ❌ {e}")
+
+            # Gmail agent
+            try:
+                from app.integrations.google_client import list_recent_emails
+
+                _ = list_recent_emails
+                lines.append("• Gmail agent: ✅ client imported")
+            except Exception as e:  # noqa: BLE001
+                lines.append(f"• Gmail agent: ❌ {e}")
+
+            # Calendar agent
+            try:
+                from app.integrations.google_client import list_upcoming_events
+
+                _ = list_upcoming_events
+                lines.append("• Calendar agent: ✅ client imported")
+            except Exception as e:  # noqa: BLE001
+                lines.append(f"• Calendar agent: ❌ {e}")
+
+            # TikTok Growth Agent
+            try:
+                if self.tga:
+                    lines.append("• TikTok Growth Agent (TGA): ✅ initialized")
+                else:
+                    lines.append("• TikTok Growth Agent (TGA): ⚠️ not initialized")
+            except Exception as e:  # noqa: BLE001
+                lines.append(f"• TikTok Growth Agent (TGA): ❌ {e}")
+
+            # DS-LAUNCH-01 pipeline core modules
+            try:
+                from app.agents.ds.ds01_market_research import analyze_market  # noqa:F401
+                from app.agents.ds.ds21_product_auto_creator import (  # noqa:F401
+                    ProductAutoCreator,
+                )
+                from app.agents.ds.ds22_image_auto_agent import ImageAutoAgent  # noqa:F401
+                from app.agents.ds.ds05_product_page_copywriter import (  # noqa:F401
+                    generate_product_page_copy_from_text,
+                )
+
+                lines.append("• DS-LAUNCH-01 pipeline: ✅ DS-01 / DS-21 / DS-22 / DS-05 online")
+            except Exception as e:  # noqa: BLE001
+                lines.append(f"• DS-LAUNCH-01 pipeline: ⚠️ import error — {e}")
+
+            lines.append("")
+            lines.append(
+                "Commander note: əgər hər hansı ❌ görsən, həmin agenti ayrıca test et:\n"
+                "• Shopify → `msp: shopify: test`\n"
+                "• Web → `msp: web: search | ping`\n"
+                "• Intel → `msp: intel: today world news`"
+            )
+
+            return "\n".join(lines)
+
+        # ==========================================================
         # 1) DS-01 MARKET RESEARCH (real module)
         # ==========================================================
         if lowered.startswith("market:") or lowered.startswith("ds01:"):
@@ -758,7 +873,7 @@ class MSP:
                 lines.append(f"Notes: {extra_notes}")
             lines.append("")
 
-            # ---- DS-01: Market research (short preview) ----
+            # ---- DS-01: Market research ----
             try:
                 from app.agents.ds.ds01_market_research import (
                     analyze_market,
@@ -767,17 +882,17 @@ class MSP:
 
                 mr_req = MarketResearchRequest(niche=niche, country=country)
                 mr_result = analyze_market(mr_req)
-                mr_preview = (mr_result or "")[:700]
+                mr_preview = (mr_result or "")[:1000]
                 lines.append("📊 *DS-01 — Market Research (short preview)*")
                 lines.append(mr_preview)
                 if mr_result and len(mr_result) > len(mr_preview):
-                    lines.append("... (truncated, full report with `msp: market: ...`)")
+                    lines.append("... (truncated, full report with msp: market: ...)")
                 lines.append("")
             except Exception as e:  # pylint: disable-broad-except
                 lines.append(f"❌ DS-01 Market Research failed: {e}")
                 lines.append("")
 
-            # ---- DS-21: Product auto creator (short) ----
+            # ---- DS-21: Product auto creator ----
             try:
                 from app.agents.ds.ds21_product_auto_creator import (
                     ProductAutoCreator,
@@ -787,20 +902,20 @@ class MSP:
                 creator = ProductAutoCreator()
                 idea = ProductIdea(
                     title_seed=f"Samarkand Soul {niche.title()}",
-                    style_brief=extra_notes or "calm luxury, minimalist, TikTok-optimized",
+                    style_brief=extra_notes
+                    or "calm luxury, minimalist, TikTok-optimized",
                     price_hint=price_hint,
                     extra_info=f"Target customer: {target_customer}",
                 )
                 product_block = creator.create_full_product(idea)
-                product_preview = (product_block or "")[:700]
                 lines.append("🧪 *DS-21 — Product concept (preview)*")
-                lines.append(product_preview)
+                lines.append(product_block)
                 lines.append("")
             except Exception as e:  # pylint: disable-broad-except
                 lines.append(f"❌ DS-21 ProductAutoCreator failed: {e}")
                 lines.append("")
 
-            # ---- DS-22: Image auto agent (short) ----
+            # ---- DS-22: Image auto agent ----
             try:
                 from app.agents.ds.ds22_image_auto_agent import (
                     ImageAutoAgent,
@@ -811,19 +926,19 @@ class MSP:
                 img_idea = ImageIdea(
                     product_name=f"Samarkand Soul {niche.title()}",
                     use_case="product page hero + TikTok ads",
-                    style_notes=extra_notes or "warm, minimalist, calm luxury, UGC-friendly",
+                    style_notes=extra_notes
+                    or "warm, minimalist, calm luxury, UGC-friendly",
                     extra_info=f"Target customer: {target_customer}",
                 )
                 image_plan = img_agent.generate_image_plan(img_idea)
-                image_preview = (image_plan or "")[:700]
                 lines.append("🖼 *DS-22 — Image & creative plan (preview)*")
-                lines.append(image_preview)
+                lines.append(image_plan)
                 lines.append("")
             except Exception as e:  # pylint: disable-broad-except
                 lines.append(f"❌ DS-22 ImageAutoAgent failed: {e}")
                 lines.append("")
 
-            # ---- DS-05: Product page copy (short) ----
+            # ---- DS-05: Product page copy ----
             try:
                 from app.agents.ds.ds05_product_page_copywriter import (
                     generate_product_page_copy_from_text,
@@ -834,9 +949,8 @@ class MSP:
                     f"{target_customer} | main benefit: solve their key pain quickly | {extra_notes}"
                 )
                 copy_block = generate_product_page_copy_from_text(copy_brief)
-                copy_preview = (copy_block or "")[:700]
                 lines.append("📝 *DS-05 — Product page copy (preview)*")
-                lines.append(copy_preview)
+                lines.append(copy_block)
                 lines.append("")
             except Exception as e:  # pylint: disable-broad-except
                 lines.append(f"❌ DS-05 Product Page Copywriter failed: {e}")
@@ -850,16 +964,10 @@ class MSP:
                 "  4) Push to Shopify via DS03 agent (msp: shopify: ...).\n"
             )
 
-            text_out = "\n".join(lines)
-
-            # Telegram 4096 char limiti üçün safety cut
-            if len(text_out) > 3800:
-                text_out = text_out[:3800] + "\n\n...(trimmed for Telegram limit)"
-
-            return text_out
+            return "\n".join(lines)
 
         # ==========================================================
-        # 3.9) DS-21 PRODUCT AUTO CREATOR
+        # 3.8) DS-21 PRODUCT AUTO CREATOR
         # ==========================================================
         if lowered.startswith("product:") or lowered.startswith("ds21:"):
             if lowered.startswith("product:"):
@@ -909,7 +1017,7 @@ class MSP:
                 return f"MSP error: DS-21 processing error: {e}"
 
         # ==========================================================
-        # 3.10) DS-22 IMAGE AUTO AGENT
+        # 3.9) DS-22 IMAGE AUTO AGENT
         # ==========================================================
         if lowered.startswith("image:") or lowered.startswith("ds22:"):
             if lowered.startswith("image:"):
@@ -959,7 +1067,7 @@ class MSP:
                 return f"MSP error: DS-22 processing error: {e}"
 
         # ==========================================================
-        # 3.11) DS-05 PRODUCT PAGE COPYWRITER
+        # 3.6) DS-05 PRODUCT PAGE COPYWRITER
         # ==========================================================
         if lowered.startswith("ds05:"):
             body = text[len("ds05:"):].strip()
@@ -983,7 +1091,7 @@ class MSP:
                 return f"MSP error: DS-05 processing error: {e}"
 
         # ==========================================================
-        # 3.12) GPT / MAMOS-aware General Chat
+        # 3.7) GPT / MAMOS-aware General Chat
         # ==========================================================
         if lowered.startswith("gpt:") or lowered.startswith("chat:"):
             if lowered.startswith("gpt:"):
@@ -1078,4 +1186,4 @@ class MSP:
             "  • msp: launch: pet hair remover | US | women 25–45 with pets | 24.90 | TikTok-friendly, impulse buy\n"
             "  • msp: gpt: Explain the Samarkand Soul brand in 3 sentences\n"
             "  • msp: tga: start  (TikTok Growth Agent daily cycle)\n"
-)
+            )
