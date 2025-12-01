@@ -397,35 +397,49 @@ def format_news_intel(query: str, num_results: int = 5) -> str:
     """
     Xüsusi NEWS / INTEL formatı.
 
-    - Query-ni daha “dünyəvi” edir:
-      latest {query} headlines + etibarlı news saytları.
-    - 2 cəhd edir, yenə də nəticə olmasa “No results found” qaytarır.
+    Yeni sadə versiya:
+      - 'today world news' kimi sorğunu təmizləyir:
+          → 'world news'
+      - 2 müxtəlif sorğu ilə cəhd edir:
+          1) latest {base_clean} news
+          2) {base_clean} news today
+      - Hər ikisi də alınmasa, sadəcə "No results found..." qaytarır.
     """
-    base = (query or "").strip() or "world news"
+    raw = (query or "").strip()
+    if not raw:
+        raw = "world news"
 
-    enriched_query = (
-        f"latest {base} headlines "
-        "site:bbc.com OR site:reuters.com OR site:apnews.com "
-        "OR site:ft.com OR site:bloomberg.com"
-    )
+    # Aşağı hərflərə salıb "today" sözünü çıxarırıq ki, "today world news" -> "world news" olsun
+    lowered = raw.lower()
+    base_clean = lowered.replace("today", "").strip()
+    if not base_clean:
+        base_clean = "world news"
 
+    display_base = base_clean  # istifadəçiyə göstərilən hissə
+
+    q1 = f"latest {base_clean} news"
+    q2 = f"{base_clean} news today"
+
+    results: List[Tuple[str, str]] = []
+
+    # 1-ci cəhd
     try:
-        results = search_web(enriched_query, num_results=num_results, intent="news")
+        results = search_web(q1, num_results=num_results, intent="news")
     except WebResearchError:
         results = []
 
+    # 2-ci cəhd
     if not results:
-        fallback_query = f"latest {base} today"
         try:
-            results = search_web(fallback_query, num_results=num_results, intent="news")
+            results = search_web(q2, num_results=num_results, intent="news")
         except WebResearchError:
             results = []
 
     if not results:
-        return f"No results found for {base}."
+        return f"No results found for {display_base}."
 
     lines: List[str] = [
-        f"🌍 *Global News Intel for:* `{base}`",
+        f"🌍 *Global News Intel for:* `{display_base}`",
         "",
     ]
 
