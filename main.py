@@ -23,7 +23,7 @@ from app.integrations.telegram_client import handle_telegram_update
 # ======================================
 # INTEL ROUTER IMPORT (DÜZGÜN PATH)
 # ======================================
-from app.integrations.intel.web_core import router as intel_router
+from app.intel.web_core import router as intel_router
 
 app = FastAPI(title="BRAT Backend")
 
