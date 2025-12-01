@@ -14,18 +14,6 @@ from app.mamos.MAMOS.mamos_loader import MAMOSLoader
 # Brat GPT – unified LLM interface (MAMOS-aware)
 from app.llm.brat_gpt import brat_gpt_chat
 
-# Daily Report – sales + life + system health
-from app.reports.daily_report_service import (
-    generate_daily_report_text,
-    send_daily_report_via_telegram,
-)
-
-# Morning Plan – commander focus plan
-from app.reports.morning_plan_service import (
-    generate_morning_plan_text,
-    send_morning_plan_via_telegram,
-)
-
 
 class MSP:
     """
@@ -179,6 +167,12 @@ class MSP:
         # 0.5) DAILY REPORT AGENT (sales + life + system)
         # ==========================================================
         if lowered.startswith("daily"):
+            # Lokal import – circular riskini öldürmək üçün
+            from app.reports.daily_report_service import (
+                generate_daily_report_text,
+                send_daily_report_via_telegram,
+            )
+
             # Accept both:
             #   msp: daily: report
             #   msp: daily report
@@ -218,6 +212,12 @@ class MSP:
         # 0.6) MORNING PLAN AGENT (commander focus plan)
         # ==========================================================
         if lowered.startswith("morning"):
+            # Lokal import – circular-dan qaçmaq üçün
+            from app.reports.morning_plan_service import (
+                generate_morning_plan_text,
+                send_morning_plan_via_telegram,
+            )
+
             # Accept:
             #   msp: morning: plan
             #   msp: morning plan
@@ -899,4 +899,4 @@ class MSP:
             "  • msp: calendar: upcoming | 5\n"
             "  • msp: gpt: Explain the Samarkand Soul brand in 3 sentences\n"
             "  • msp: tga: start  (TikTok Growth Agent daily cycle)\n"
-    )
+            )
