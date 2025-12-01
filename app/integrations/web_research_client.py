@@ -169,7 +169,12 @@ def _search_with_duckduckgo_html(query: str, num_results: int) -> List[Tuple[str
     }
 
     try:
-        resp = requests.get(search_url, params=params, headers=DEFAULT_HEADERS, timeout=DEFAULT_TIMEOUT)
+        resp = requests.get(
+            search_url,
+            params=params,
+            headers=DEFAULT_HEADERS,
+            timeout=DEFAULT_TIMEOUT,
+        )
         resp.raise_for_status()
     except Exception as e:
         raise WebResearchError(f"DuckDuckGo request failed: {e}") from e
@@ -190,8 +195,11 @@ def _search_with_duckduckgo_html(query: str, num_results: int) -> List[Tuple[str
         if len(results) >= num_results:
             break
 
+    # 🔧 DƏYİŞİKLİK BURADADIR
     if not results:
-        raise WebResearchError("DuckDuckGo HTML returned no results or layout changed.")
+        # Layout dəyişibsə və ya nəticə gəlmirsə – error atmaq əvəzinə boş list.
+        # Yuxarıdakı format_search_results() bunu "nəticə tapılmadı" kimi göstərəcək.
+        return []
 
     return results
 
