@@ -96,14 +96,9 @@ def search_web(
     Strategy:
       - Əgər SEARCH_PROVIDER env ilə konkret provider seçilibsə → onu işə sal.
       - Əks halda (AUTO) → multi-provider chain:
-          intent="general":
-             1) Bing HTML
-             2) DuckDuckGo HTML
-             3) Brave HTML
-          intent="news":
-             1) DuckDuckGo HTML
-             2) Brave HTML
-             3) Bing HTML
+          1) Bing HTML
+          2) DuckDuckGo HTML
+          3) Brave HTML
         və ilk uğurlu nəticə verən provider istifadə olunur.
     """
     provider = SEARCH_PROVIDER
@@ -140,30 +135,18 @@ def _search_chain(
     intent: str = "general",
 ) -> List[Tuple[str, str]]:
     """
-    Multi-provider chain.
+    Multi-provider chain:
+      1) Bing HTML
+      2) DuckDuckGo HTML
+      3) Brave HTML
 
-    intent="general":
-      1) Bing
-      2) DuckDuckGo
-      3) Brave
-
-    intent="news":
-      1) DuckDuckGo
-      2) Brave
-      3) Bing
+    İlk uğurlu nəticəni qaytarır, hamısı yanarsa WebResearchError atır.
     """
-    if intent == "news":
-        providers = [
-            ("DuckDuckGo", _search_with_duckduckgo_html),
-            ("Brave", _search_with_brave_html),
-            ("Bing", _search_with_bing_html),
-        ]
-    else:
-        providers = [
-            ("Bing", _search_with_bing_html),
-            ("DuckDuckGo", _search_with_duckduckgo_html),
-            ("Brave", _search_with_brave_html),
-        ]
+    providers = [
+        ("Bing", _search_with_bing_html),
+        ("DuckDuckGo", _search_with_duckduckgo_html),
+        ("Brave", _search_with_brave_html),
+    ]
 
     last_error: Optional[Exception] = None
     for name, fn in providers:
@@ -257,12 +240,13 @@ def _search_with_duckduckgo_html(query: str, num_results: int) -> List[Tuple[str
     soup = BeautifulSoup(resp.text, "html.parser")
 
     results: List[Tuple[str, str]] = []
-    for a in soup.select("a.result__a"):
+
+    # Bir neçə potensial selector – layout dəyişəndə də şans artsın
+    for a in soup.select("a.result__a, a.result__url, h2 a"):
         title = a.get_text(strip=True)
         link = a.get("href")
         if not link or not title:
             continue
-
         results.append((title, link))
         if len(results) >= num_results:
             break
@@ -338,7 +322,7 @@ def _search_with_brave_html(query: str, num_results: int) -> List[Tuple[str, str
     results: List[Tuple[str, str]] = []
 
     # Brave nəticələri üçün tipik selector-lar
-    for a in soup.select("a.result-header, div.snippet-title a"):
+    for a in soup.select("a.result-header, div.snippet-title a, h2 a"):
         title = a.get_text(strip=True)
         link = a.get("href")
         if not title or not link:
@@ -351,6 +335,56 @@ def _search_with_brave_html(query: str, num_results: int) -> List[Tuple[str, str
         raise WebResearchError("Brave HTML returned no results or layout changed.")
 
     return results
+
+
+# ============================================================
+#  NEWS-specific helpers (RSS-based for real headlines)
+# ============================================================
+
+def _fetch_world_news_rss(num_results: int = 5) -> List[Tuple[str, str]]:
+    """
+    Dünya xəbərləri üçün stabil yol:
+    Birbaşa BBC, Reuters, AP və s.-nin RSS feed-lərindən oxuyuruq.
+    Burda heç bir search engine yoxdur, ona görə zibil nəticə gəlmir.
+    """
+    feeds = [
+        # BBC World
+        ("BBC World", "https://feeds.bbci.co.uk/news/world/rss.xml"),
+        # Reuters World News
+        ("Reuters World", "https://feeds.reuters.com/Reuters/worldNews"),
+        # AP – Top News (burda da world xəbərləri çox olur)
+        ("AP Top", "https://rss.apnews.com/apf-topnews"),
+    ]
+
+    items: List[Tuple[str, str]] = []
+
+    for name, url in feeds:
+        try:
+            xml_text = fetch_url(url)
+        except WebResearchError:
+            continue
+
+        # RSS üçün XML parser daha təhlükəsizdir
+        soup = BeautifulSoup(xml_text, "xml")
+
+        for item in soup.find_all("item"):
+            title_tag = item.find("title")
+            link_tag = item.find("link")
+
+            title = title_tag.get_text(strip=True) if title_tag else ""
+            link = link_tag.get_text(strip=True) if link_tag else ""
+
+            if not title or not link:
+                continue
+
+            items.append((title, link))
+            if len(items) >= num_results:
+                break
+
+        if len(items) >= num_results:
+            break
+
+    return items
 
 
 # ============================================================
@@ -414,82 +448,65 @@ def format_news_intel(query: str, num_results: int = 5) -> str:
     """
     Xüsusi NEWS / INTEL formatı.
 
-    Yeni versiya:
-      - 'today world news' → 'world news' kimi təmizləyir.
-      - 'news' sözü artıq içindədirsə, ikinci dəfə 'news news' yazmırıq.
-      - İlk 2 cəhd yalnız etibarlı news saytları:
-          BBC, Reuters, AP, FT, Bloomberg, Al Jazeera
-      - Sonra 2 cəhd tam filtrsiz (sadəcə yaxşı news nəticələri tapsın deyə).
+    - Əgər sorğu ümumi "world news", "today world news" tipindədirsə →
+      birbaşa BBC / Reuters / AP RSS-dən oxuyuruq (zero-zibil, real xəbərlər).
+    - Daha spesifik sorğular üçün yenə search engine chain istifadə olunur.
     """
-    raw = (query or "").strip()
-    if not raw:
-        raw = "world news"
+    base = (query or "").strip()
+    base_lower = base.lower() if base else ""
 
-    lowered = raw.lower()
-    # "today" sözünü atırıq ki, baz sorğu təmiz olsun
-    lowered = lowered.replace("today", "").strip()
-    if not lowered:
-        lowered = "world news"
+    # --- 1) WORLD NEWS CASE — RSS İLƏ ---
+    if (
+        not base_lower
+        or "world news" in base_lower
+        or base_lower in ("world", "news", "today world news", "today news")
+    ):
+        headlines = _fetch_world_news_rss(num_results=num_results)
 
-    base_clean = lowered
-    display_base = base_clean
+        if not headlines:
+            return "No results found for world news."
 
-    # İlk 2 cəhd üçün news sayt filtri
-    news_sites = (
+        lines: List[str] = [
+            "🌍 *Global News Intel — World Headlines*",
+            "",
+        ]
+
+        for idx, (title, url) in enumerate(headlines, start=1):
+            lines.append(f"{idx}. *{title}*\n   {url}")
+
+        lines.append(
+            "\nDaha dərin analiz üçün konkret linki belə açdır:\n"
+            "`msp: web: fetch | https://example.com`"
+        )
+
+        return "\n".join(lines)
+
+    # --- 2) SPESİFİK NEWS SORĞULARI ÜÇÜN KEÇMİŞ SEARCH-BAZALI YOL ---
+    base_clean = base or "world news"
+
+    enriched_query = (
+        f"latest {base_clean} headlines "
         "site:bbc.com OR site:reuters.com OR site:apnews.com "
-        "OR site:ft.com OR site:bloomberg.com OR site:aljazeera.com"
+        "OR site:ft.com OR site:bloomberg.com"
     )
 
-    # "news" artıq içindədirsə, yenidən "news" əlavə etmirik
-    if "news" in base_clean:
-        q1 = f"latest {base_clean} {news_sites}"
-        q2 = f"{base_clean} today {news_sites}"
-    else:
-        q1 = f"latest {base_clean} news {news_sites}"
-        q2 = f"{base_clean} news today {news_sites}"
-
-    results: List[Tuple[str, str]] = []
-
-    # 1-ci cəhd – filter + latest
     try:
-        results = search_web(q1, num_results=num_results, intent="news")
+        results = search_web(enriched_query, num_results=num_results, intent="news")
     except WebResearchError:
         results = []
 
-    # 2-ci cəhd – filter + today
     if not results:
+        fallback_query = f"latest {base_clean} today"
         try:
-            results = search_web(q2, num_results=num_results, intent="news")
-        except WebResearchError:
-            results = []
-
-    # 3-cü cəhd – filtrsiz latest world news
-    if not results:
-        if "news" in base_clean:
-            q3 = f"latest {base_clean}"
-        else:
-            q3 = f"latest {base_clean} world news"
-        try:
-            results = search_web(q3, num_results=num_results, intent="news")
-        except WebResearchError:
-            results = []
-
-    # 4-cü cəhd – filtrsiz world news today
-    if not results:
-        if "news" in base_clean:
-            q4 = f"{base_clean} today"
-        else:
-            q4 = f"{base_clean} world news today"
-        try:
-            results = search_web(q4, num_results=num_results, intent="news")
+            results = search_web(fallback_query, num_results=num_results, intent="news")
         except WebResearchError:
             results = []
 
     if not results:
-        return f"No results found for {display_base}."
+        return f"No results found for {base_clean}."
 
     lines: List[str] = [
-        f"🌍 *Global News Intel for:* `{display_base}`",
+        f"🌍 *Global News Intel for:* `{base_clean}`",
         "",
     ]
 
