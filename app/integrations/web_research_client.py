@@ -96,9 +96,14 @@ def search_web(
     Strategy:
       - Əgər SEARCH_PROVIDER env ilə konkret provider seçilibsə → onu işə sal.
       - Əks halda (AUTO) → multi-provider chain:
-          1) Bing HTML
-          2) DuckDuckGo HTML
-          3) Brave HTML
+          intent="general":
+             1) Bing HTML
+             2) DuckDuckGo HTML
+             3) Brave HTML
+          intent="news":
+             1) DuckDuckGo HTML
+             2) Brave HTML
+             3) Bing HTML
         və ilk uğurlu nəticə verən provider istifadə olunur.
     """
     provider = SEARCH_PROVIDER
@@ -135,18 +140,30 @@ def _search_chain(
     intent: str = "general",
 ) -> List[Tuple[str, str]]:
     """
-    Multi-provider chain:
-      1) Bing HTML
-      2) DuckDuckGo HTML
-      3) Brave HTML
+    Multi-provider chain.
 
-    İlk uğurlu nəticəni qaytarır, hamısı yanarsa WebResearchError atır.
+    intent="general":
+      1) Bing
+      2) DuckDuckGo
+      3) Brave
+
+    intent="news":
+      1) DuckDuckGo
+      2) Brave
+      3) Bing
     """
-    providers = [
-        ("Bing", _search_with_bing_html),
-        ("DuckDuckGo", _search_with_duckduckgo_html),
-        ("Brave", _search_with_brave_html),
-    ]
+    if intent == "news":
+        providers = [
+            ("DuckDuckGo", _search_with_duckduckgo_html),
+            ("Brave", _search_with_brave_html),
+            ("Bing", _search_with_bing_html),
+        ]
+    else:
+        providers = [
+            ("Bing", _search_with_bing_html),
+            ("DuckDuckGo", _search_with_duckduckgo_html),
+            ("Brave", _search_with_brave_html),
+        ]
 
     last_error: Optional[Exception] = None
     for name, fn in providers:
@@ -400,11 +417,9 @@ def format_news_intel(query: str, num_results: int = 5) -> str:
     Yeni versiya:
       - 'today world news' → 'world news' kimi təmizləyir.
       - 'news' sözü artıq içindədirsə, ikinci dəfə 'news news' yazmırıq.
-      - Yalnız etibarlı news saytları:
+      - İlk 2 cəhd yalnız etibarlı news saytları:
           BBC, Reuters, AP, FT, Bloomberg, Al Jazeera
-      - 2 sorğu ilə cəhd edir:
-          1) latest {base_clean}
-          2) {base_clean} today
+      - Sonra 2 cəhd tam filtrsiz (sadəcə yaxşı news nəticələri tapsın deyə).
     """
     raw = (query or "").strip()
     if not raw:
@@ -419,7 +434,7 @@ def format_news_intel(query: str, num_results: int = 5) -> str:
     base_clean = lowered
     display_base = base_clean
 
-    # Əlavə news sayt filtri
+    # İlk 2 cəhd üçün news sayt filtri
     news_sites = (
         "site:bbc.com OR site:reuters.com OR site:apnews.com "
         "OR site:ft.com OR site:bloomberg.com OR site:aljazeera.com"
@@ -435,16 +450,38 @@ def format_news_intel(query: str, num_results: int = 5) -> str:
 
     results: List[Tuple[str, str]] = []
 
-    # 1-ci cəhd
+    # 1-ci cəhd – filter + latest
     try:
         results = search_web(q1, num_results=num_results, intent="news")
     except WebResearchError:
         results = []
 
-    # 2-ci cəhd
+    # 2-ci cəhd – filter + today
     if not results:
         try:
             results = search_web(q2, num_results=num_results, intent="news")
+        except WebResearchError:
+            results = []
+
+    # 3-cü cəhd – filtrsiz latest world news
+    if not results:
+        if "news" in base_clean:
+            q3 = f"latest {base_clean}"
+        else:
+            q3 = f"latest {base_clean} world news"
+        try:
+            results = search_web(q3, num_results=num_results, intent="news")
+        except WebResearchError:
+            results = []
+
+    # 4-cü cəhd – filtrsiz world news today
+    if not results:
+        if "news" in base_clean:
+            q4 = f"{base_clean} today"
+        else:
+            q4 = f"{base_clean} world news today"
+        try:
+            results = search_web(q4, num_results=num_results, intent="news")
         except WebResearchError:
             results = []
 
