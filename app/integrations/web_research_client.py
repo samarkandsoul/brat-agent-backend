@@ -362,10 +362,15 @@ def _fetch_world_news_rss(num_results: int = 5) -> List[Tuple[str, str]]:
         try:
             xml_text = fetch_url(url)
         except WebResearchError:
+            # bu feed alınmadı, növbətiyə keç
             continue
 
-        # RSS üçün XML parser daha təhlükəsizdir
-        soup = BeautifulSoup(xml_text, "xml")
+        # ❗ Burada əvvəl sadəcə "xml" parser idi və bəzi serverlərdə quraşdırılmayıb.
+        #   Ona görə try/except ilə "html.parser" fallback əlavə edirik.
+        try:
+            soup = BeautifulSoup(xml_text, "xml")
+        except Exception:
+            soup = BeautifulSoup(xml_text, "html.parser")
 
         for item in soup.find_all("item"):
             title_tag = item.find("title")
