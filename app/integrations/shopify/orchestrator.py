@@ -10,33 +10,39 @@ from __future__ import annotations
 
 from typing import List, Dict, Any, Optional
 
-from app.integrations.shopify_client import ShopifyClient  # mövcud klientdən istifadə
+from app.integrations.shopify_client import ShopifyClient
 from app.integrations.shopify.models import Product, Order
 from app.integrations.shopify.product_mapper import ProductMapper
+from app.integrations.shopify.order_mapper import OrderMapper
 
 
 class ShopifyOrchestrator:
     """
-    Bu class Brat sistemində "Shopify ilə danışan general" rolundadır.
+    Brat sistemində "Shopify ilə danışan general".
 
-    İndiki mərhələdə:
-    - Məhsulları çəkmək (client → mapper → Product modeli)
-    - Product modelindən çıxış edib Shopify üçün payload hazırlamaq
-    - Product-u create/update üçün ShopifyClient-ə ötürmək
+    Hazırda:
+      - Məhsulları çəkə bilir (client → mapper → Product modeli)
+      - Product modelindən çıxış edib Shopify üçün payload hazırlaya bilir
+      - Sifarişləri xam JSON-dan Order modelinə map edə bilir (client + OrderMapper)
 
-    Gələcək mərhələlərdə:
-    - inventory_sync_service
-    - order_sync_service
-    - metafield_manager
-    - collection_manager
-    - pricing_rules_engine
-    - seo_optimizer
-    burada instansiya səviyyəsində istifadə olunacaq.
+    Gələcəkdə:
+      - inventory_sync_service
+      - metafield_manager
+      - collection_manager
+      - pricing_rules_engine
+      - seo_optimizer
+    bu orchestrator daxilində istifadə olunacaq.
     """
 
-    def __init__(self, client: ShopifyClient, mapper: Optional[ProductMapper] = None) -> None:
+    def __init__(
+        self,
+        client: ShopifyClient,
+        product_mapper: Optional[ProductMapper] = None,
+        order_mapper: Optional[OrderMapper] = None,
+    ) -> None:
         self.client = client
-        self.mapper = mapper or ProductMapper()
+        self.product_mapper = product_mapper or ProductMapper()
+        self.order_mapper = order_mapper or OrderMapper()
 
     # -----------------------------
     # PRODUCT AXINI
@@ -45,55 +51,40 @@ class ShopifyOrchestrator:
     def fetch_products(self, limit: int = 50) -> List[Product]:
         """
         Shopify-dan məhsulları çəkib Product modelinə map edir.
-
-        Gözlənilən ShopifyClient interface-i (sonra implement ediləcək):
-            client.list_products(limit: int) -> List[Dict[str, Any]]
-
-        Burada:
-        1) client-dən xam product JSON-ları alırıq
-        2) ProductMapper ilə List[Product]-ə çeviririk
         """
-        raw_products: List[Dict[str, Any]] = self.client.list_products(limit=limit)  # TODO: client implement
-        products: List[Product] = self.mapper.raw_list_to_products(raw_products)
+        raw_products: List[Dict[str, Any]] = self.client.list_products(limit=limit)
+        products: List[Product] = self.product_mapper.raw_list_to_products(raw_products)
         return products
 
     def upsert_product(self, product: Product) -> Dict[str, Any]:
         """
         Daxili Product modelindən çıxış edib Shopify product yaradır / yeniləyir.
-
-        Məntiq:
-        - əgər product.id varsa → update kimi davran
-        - yoxdursa → create kimi davran
-
-        Gözlənilən ShopifyClient interface-i:
-            client.create_product(payload: Dict[str, Any]) -> Dict[str, Any]
-            client.update_product(product_id: int, payload: Dict[str, Any]) -> Dict[str, Any]
         """
-        payload = self.mapper.product_to_payload(product)
+        payload = self.product_mapper.product_to_payload(product)
 
         if product.id is None:
             # YENİ məhsul yarat
-            result = self.client.create_product(payload)  # TODO: client implement
+            result = self.client.create_product(payload)
         else:
             # MÖVCUD məhsulu yenilə
-            result = self.client.update_product(product.id, payload)  # TODO: client implement
+            result = self.client.update_product(product.id, payload)
 
         return result
 
     # -----------------------------
-    # ORDER AXINI (hələ skeleton)
+    # ORDER AXINI
     # -----------------------------
 
-    def fetch_recent_orders(self, limit: int = 50) -> List[Order]:
+    def fetch_recent_orders(self, limit: int = 50, status: str = "any") -> List[Order]:
         """
-        Shopify-dan son sifarişləri çəkən skeleton.
+        Shopify-dan son sifarişləri çəkib Order modelinə map edir.
 
-        Gələcəkdə:
-        - ShopifyClient-də `list_orders` method-u olacaq
-        - Xam JSON Order modelinə map olunacaq
+        Gözlənilən ShopifyClient interface-i:
+          client.list_orders(limit: int, status: str) -> List[Dict[str, Any]]
         """
-        _ = limit
-        return []
+        raw_orders: List[Dict[str, Any]] = self.client.list_orders(limit=limit, status=status)
+        orders: List[Order] = self.order_mapper.raw_list_to_orders(raw_orders)
+        return orders
 
     def sync_orders_to_internal(self) -> int:
         """
@@ -103,6 +94,7 @@ class ShopifyOrchestrator:
           - fetch_recent_orders
           - daxili DB/analytics servisinə yaz
         """
+        # Hələlik sadəcə heç nə etmir və 0 qaytarır
         return 0
 
     # -----------------------------
