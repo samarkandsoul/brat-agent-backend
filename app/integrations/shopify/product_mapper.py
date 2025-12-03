@@ -1,78 +1,35 @@
-"""
-Product Mapper
-
-Brat agentlərindən gələn məhsul datasını
-Shopify API üçün uyğun struktura çevirən skeleton.
-"""
-
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
-
-
-@dataclass
-class BratProductPayload:
-  title: str
-  description: str
-  price: float
-  currency: str = "USD"
-  sku: Optional[str] = None
-  tags: Optional[List[str]] = None
-  images: Optional[List[str]] = None
-  options: Optional[Dict[str, List[str]]] = None  # {"Size": ["S","M"]}
-
-
-@dataclass
-class ShopifyProductPayload:
-  title: str
-  body_html: str
-  variants: List[Dict[str, Any]]
-  images: List[Dict[str, Any]]
-  tags: str
+from typing import Any, Dict
+from app.integrations.shopify_client import ShopifyClient
 
 
 class ProductMapper:
-  """Brat → Shopify məhsul map-ləmə beyni."""
+    """
+    Brat daxili product modelini Shopify product strukturuna map edən servis.
 
-  def from_raw(self, raw: Dict[str, Any]) -> BratProductPayload:
-    # TODO: input validation + error handling
-    return BratProductPayload(
-      title=(raw.get("title") or "").strip(),
-      description=(raw.get("description") or "").strip(),
-      price=float(raw.get("price", 0.0)),
-      currency=raw.get("currency", "USD"),
-      sku=raw.get("sku"),
-      tags=raw.get("tags") or [],
-      images=raw.get("images") or [],
-      options=raw.get("options") or {},
-    )
+    TODO:
+      - Daxili product schema-nı dəqiqləşdir
+      - Shopify API üçün lazımi field-ları map et
+    """
 
-  def to_shopify(self, brat: BratProductPayload) -> ShopifyProductPayload:
-    # TODO: multi-variant dəstəyi, inventory, taxes və s.
-    variant = {
-      "price": str(brat.price),
-      "sku": brat.sku or "",
-    }
-    images = [{"src": url} for url in (brat.images or [])]
-    tags_str = ",".join(brat.tags or [])
+    def __init__(self, client: ShopifyClient) -> None:
+        self.client = client
 
-    return ShopifyProductPayload(
-      title=brat.title,
-      body_html=brat.description,
-      variants=[variant],
-      images=images,
-      tags=tags_str,
-    )
+    def to_shopify_payload(self, product: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Daxili product dict -> Shopify product payload
+        """
+        # TODO: real mapping
+        payload: Dict[str, Any] = {
+            "title": product.get("title"),
+            "body_html": product.get("description"),
+            "status": product.get("status", "active"),
+        }
+        return payload
 
-  def map_raw_to_shopify(self, raw: Dict[str, Any]) -> Dict[str, Any]:
-    brat_payload = self.from_raw(raw)
-    shopify_payload = self.to_shopify(brat_payload)
-
-    return {
-      "product": {
-        "title": shopify_payload.title,
-        "body_html": shopify_payload.body_html,
-        "variants": shopify_payload.variants,
-        "images": shopify_payload.images,
-        "tags": shopify_payload.tags,
-      }
-  }
+    def upsert_product(self, product: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Mövcudsa update, yoxdursa create.
+        """
+        payload = self.to_shopify_payload(product)
+        # TODO: burada client.create_or_update_product istifadə et
+        raise NotImplementedError("Product upsert hələ implement olunmayıb.")
