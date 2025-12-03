@@ -7,7 +7,7 @@ from typing import Optional, List, Dict
 
 app = FastAPI(
     title="Brat TikTok Growth API",
-    version="0.1.0",
+    version="0.1.1",
     description="Service layer for orchestrating TikTok growth agents.",
 )
 
@@ -41,30 +41,16 @@ class ScheduleRequest(BaseModel):
 
 class TikTokGrowthOrchestrator:
     """
-    Bu class tiktok_growth içindəki bütün agentləri
-    (ad_script_lab, creative_brain, hashtag_brain, sound_trend_scanner və s.)
-    üzərində üst-qat orkestr rolunu oynayacaq.
-
-    İNDİLİK SKELETONDUR – içi sonradan real agent çağırışları ilə doldurulacaq.
+    Bütün TikTok agentlərini idarə edən üst qatda orkestr class.
+    (ad_script_lab, creative_brain, hashtag_brain və s.)
+    Hal-hazırda skeleton formadadır.
     """
 
     def __init__(self) -> None:
-        # Burada gələcəkdə real agent modullarını import edib
-        # instance kimi saxlayacağıq.
-        # Məs: self.script_lab = AdScriptLab(...)
+        # Gələcəkdə real agent modullarını burada instanslaşdıracağıq.
         pass
 
     async def generate_idea(self, req: TikTokIdeaRequest) -> TikTokPostPlan:
-        """
-        Gələcəkdə:
-        - ad_script_lab → hook + script
-        - creative_brain → kreativ bucaq
-        - hashtag_brain → hashtag listi
-        - sound_trend_scanner → sound hint
-        İndi isə sadəcə skeleton cavab qaytarır.
-        """
-
-        # TODO: real agent çağırışları əlavə ediləcək.
         dummy_hashtags = ["#tiktok", "#samarkandsoul", "#bratengine"]
 
         return TikTokPostPlan(
@@ -72,16 +58,10 @@ class TikTokGrowthOrchestrator:
             script="This is a placeholder script. Real script engine will be wired soon.",
             caption="Placeholder caption for your TikTok video.",
             hashtags=dummy_hashtags,
-            sound_hint="Use a currently trending sound in your niche.",
+            sound_hint="Use a trending sound in your niche.",
         )
 
     async def schedule_post(self, req: ScheduleRequest) -> Dict[str, str]:
-        """
-        Gələcəkdə:
-        - tiktok_post_scheduler agentini çağıracaq.
-        Hal-hazırda sadəcə success mesajı qaytarır.
-        """
-        # TODO: real TikTok API integration.
         return {
             "status": "scheduled_fake",
             "video_url": req.video_url,
@@ -94,38 +74,43 @@ class TikTokGrowthOrchestrator:
 orchestrator = TikTokGrowthOrchestrator()
 
 
-# --------- Health & basic endpoints --------- #
+# --------- Health & Status Endpoints --------- #
 
 @app.get("/health")
 async def health_check() -> Dict[str, str]:
     """
-    Render monitor, backend və monitor-ui üçün heartbeat endpoint.
+    Render monitor & agent-brain heartbeat endpoint.
     """
     return {"status": "ok", "service": "tiktok_growth"}
 
 
+@app.get("/status")
+async def status_check() -> Dict[str, str]:
+    """
+    Servisin vəziyyətini bildirən endpoint.
+    Monitor və orchestrator üçün lazımlıdır.
+    """
+    return {
+        "service": "tiktok_growth",
+        "uptime": "running",
+        "mode": "live",
+        "version": "0.1.1"
+    }
+
+
+# --------- Main TikTok Endpoints --------- #
+
 @app.post("/tiktok/idea", response_model=TikTokPostPlan)
 async def create_tiktok_idea(req: TikTokIdeaRequest):
-    """
-    High-level endpoint:
-    Bir product/offer üçün TikTok ideyası + script + caption skeletonu qaytarır.
-    Hazırda dummy cavabdır, amma strukturu sabitdir.
-    """
     try:
         return await orchestrator.generate_idea(req)
     except Exception as exc:  # noqa: BLE001
-        # Burada gələcəkdə global_error_handler-ə pass edəcəyik.
         raise HTTPException(status_code=500, detail=str(exc))
 
 
 @app.post("/tiktok/schedule")
 async def schedule_tiktok_post(req: ScheduleRequest):
-    """
-    TikTok postunu planlamaq üçün skeleton endpoint.
-    Gələcəkdə real TikTok API + tiktok_post_scheduler agentinə bağlanacaq.
-    """
     try:
-        result = await orchestrator.schedule_post(req)
-        return result
+        return await orchestrator.schedule_post(req)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=str(exc))
