@@ -48,4 +48,5 @@ class VideoTemplateLibrary:
     def get(self, name: str) -> VideoTemplateSpec:
         return self._templates[name]
 
-    def list_for
+    def list_for_platform(self, platform: str) -> List[VideoTemplateSpec]:
+        return [t for t in self._templates.values() if t.platform == platform]
