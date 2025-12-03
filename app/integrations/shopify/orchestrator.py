@@ -16,6 +16,10 @@ from app.integrations.shopify.models import Product, Order
 from app.integrations.shopify.product_mapper import ProductMapper
 from app.integrations.shopify.order_mapper import OrderMapper
 from app.integrations.shopify.inventory_sync_service import InventorySyncService, InventorySyncResult
+from app.integrations.shopify.pricing_rules_engine import (
+    PricingRulesEngine,
+    PricingSuggestionBatch,
+)
 
 
 class ShopifyOrchestrator:
@@ -27,6 +31,7 @@ class ShopifyOrchestrator:
       - Product modelindən çıxış edib Shopify product yaratmaq / yeniləmək
       - Sifarişləri çəkib Order modelinə map etmək
       - Daxili stock xəritəsindən çıxış edib inventory sync üçün skeleton axın
+      - Məhsullar üçün qiymət təklifləri hesablamaq üçün PricingRulesEngine istifadə etmək
     """
 
     def __init__(
@@ -35,11 +40,13 @@ class ShopifyOrchestrator:
         product_mapper: Optional[ProductMapper] = None,
         order_mapper: Optional[OrderMapper] = None,
         inventory_sync_service: Optional[InventorySyncService] = None,
+        pricing_rules_engine: Optional[PricingRulesEngine] = None,
     ) -> None:
         self.client = client
         self.product_mapper = product_mapper or ProductMapper()
         self.order_mapper = order_mapper or OrderMapper()
         self.inventory_sync_service = inventory_sync_service or InventorySyncService(client)
+        self.pricing_rules_engine = pricing_rules_engine or PricingRulesEngine()
 
     # -----------------------------
     # PRODUCT AXINI
@@ -115,19 +122,53 @@ class ShopifyOrchestrator:
         }
 
     # -----------------------------
-    # PRICE AXINI (hələ skeleton)
+    # PRICE AXINI
     # -----------------------------
 
     def recalculate_prices_for_products(
         self,
         product_ids: Optional[list] = None,
+        limit: int = 50,
     ) -> Dict[str, Any]:
         """
         Məhsullar üçün qiyməti qaydalara əsasən yenidən hesablayır.
 
+        Hazır skeleton mərhələsində:
+          - product_ids istifadə olunmur, sadəcə fetch_products(limit) çağırılır.
+          - PricingRulesEngine sadə təkliflər qaytarır.
         Gələcəkdə:
-          - pricing_rules_engine
-          - product_mapper
+          - product_ids filter
+          - cost məlumatı ilə real marja hesablaması
+          - təkliflərin Shopify-a tətbiqi (upsert_product)
         """
-        _ = product_ids
-        return {"status": "not_implemented"}
+        # Hazırda product_ids ignored – skeleton mərhələsidir
+        products: List[Product] = self.fetch_products(limit=limit)
+        batches: List[PricingSuggestionBatch] = self.pricing_rules_engine.suggest_for_products(products)
+
+        # Sadə qaytarılacaq struktur – gələcəkdə daha detallı ola bilər
+        response_products: List[Dict[str, Any]] = []
+
+        for batch in batches:
+            product_info = {
+                "product_id": batch.product_id,
+                "handle": batch.handle,
+                "suggestions": [],
+            }
+            for s in batch.suggestions:
+                product_info["suggestions"].append(
+                    {
+                        "sku": s.sku,
+                        "old_price": s.old_price.amount,
+                        "old_currency": s.old_price.currency,
+                        "suggested_price": s.suggested_price.amount,
+                        "suggested_currency": s.suggested_price.currency,
+                        "reason": s.reason,
+                    }
+                )
+            response_products.append(product_info)
+
+        return {
+            "total_products": len(response_products),
+            "products": response_products,
+            "note": "Skeleton pricing suggestions only, not applied to Shopify yet.",
+      }
