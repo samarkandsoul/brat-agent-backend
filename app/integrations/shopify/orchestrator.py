@@ -3,7 +3,8 @@ Shopify Orchestrator (beynə yaxın skeleton)
 
 Məqsəd:
 - Bütün Shopify ilə bağlı yüksək səviyyəli əməliyyatları tək yerdə toplamaq
-- Aşağı səviyyə klient (ShopifyClient) + mapper-lər ilə üst səviyyə biznes axını arasında körpü olmaq
+- Aşağı səviyyə klient (ShopifyClient) + mapper-lər + servis-lərlə
+  üst səviyyə biznes axını arasında körpü olmaq
 """
 
 from __future__ import annotations
@@ -14,24 +15,18 @@ from app.integrations.shopify_client import ShopifyClient
 from app.integrations.shopify.models import Product, Order
 from app.integrations.shopify.product_mapper import ProductMapper
 from app.integrations.shopify.order_mapper import OrderMapper
+from app.integrations.shopify.inventory_sync_service import InventorySyncService, InventorySyncResult
 
 
 class ShopifyOrchestrator:
     """
     Brat sistemində "Shopify ilə danışan general".
 
-    Hazırda:
-      - Məhsulları çəkə bilir (client → mapper → Product modeli)
-      - Product modelindən çıxış edib Shopify üçün payload hazırlaya bilir
-      - Sifarişləri xam JSON-dan Order modelinə map edə bilir (client + OrderMapper)
-
-    Gələcəkdə:
-      - inventory_sync_service
-      - metafield_manager
-      - collection_manager
-      - pricing_rules_engine
-      - seo_optimizer
-    bu orchestrator daxilində istifadə olunacaq.
+    Hazırda edə bildikləri:
+      - Məhsulları çəkir (client → ProductMapper → Product modeli)
+      - Product modelindən çıxış edib Shopify product yaratmaq / yeniləmək
+      - Sifarişləri çəkib Order modelinə map etmək
+      - Daxili stock xəritəsindən çıxış edib inventory sync üçün skeleton axın
     """
 
     def __init__(
@@ -39,10 +34,12 @@ class ShopifyOrchestrator:
         client: ShopifyClient,
         product_mapper: Optional[ProductMapper] = None,
         order_mapper: Optional[OrderMapper] = None,
+        inventory_sync_service: Optional[InventorySyncService] = None,
     ) -> None:
         self.client = client
         self.product_mapper = product_mapper or ProductMapper()
         self.order_mapper = order_mapper or OrderMapper()
+        self.inventory_sync_service = inventory_sync_service or InventorySyncService(client)
 
     # -----------------------------
     # PRODUCT AXINI
@@ -78,9 +75,6 @@ class ShopifyOrchestrator:
     def fetch_recent_orders(self, limit: int = 50, status: str = "any") -> List[Order]:
         """
         Shopify-dan son sifarişləri çəkib Order modelinə map edir.
-
-        Gözlənilən ShopifyClient interface-i:
-          client.list_orders(limit: int, status: str) -> List[Dict[str, Any]]
         """
         raw_orders: List[Dict[str, Any]] = self.client.list_orders(limit=limit, status=status)
         orders: List[Order] = self.order_mapper.raw_list_to_orders(raw_orders)
@@ -98,18 +92,31 @@ class ShopifyOrchestrator:
         return 0
 
     # -----------------------------
-    # INVENTORY / PRICE AXINI (hələ skeleton)
+    # INVENTORY AXINI
     # -----------------------------
 
     def sync_inventory_from_internal(self, stock_map: Dict[str, int]) -> Dict[str, Any]:
         """
         SKU → qalıq sayı xəritəsindən çıxış edib Shopify-də stokları yeniləyir.
 
-        Gələcəkdə:
-          - inventory_sync_service istifadə ediləcək
+        stock_map nümunə:
+          {
+            "SKU-123": 10,
+            "SKU-456": 0,
+          }
         """
-        _ = stock_map
-        return {"status": "not_implemented"}
+        result: InventorySyncResult = self.inventory_sync_service.sync_from_stock_map(stock_map)
+
+        return {
+            "attempted": result.attempted,
+            "success": result.success,
+            "failed": result.failed,
+            "raw_response": result.raw_response,
+        }
+
+    # -----------------------------
+    # PRICE AXINI (hələ skeleton)
+    # -----------------------------
 
     def recalculate_prices_for_products(
         self,
