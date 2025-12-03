@@ -208,7 +208,9 @@ class ShopifyClient:
           - SKU → inventory_item_id map-i qurulacaq
           - /inventory_levels/adjust.json və s. endpoint-lərdən istifadə ediləcək.
         """
-        raise NotImplementedError("ShopifyClient.update_inventory_bulk hələ implement olunmayıb.")
+        raise NotImplementedError(
+            "ShopifyClient.update_inventory_bulk hələ implement olunmayıb."
+        )
 
     # -----------------------------
     # COLLECTIONS
@@ -221,7 +223,9 @@ class ShopifyClient:
         Gələcək implementasiya:
           GET /custom_collections.json və ya /smart_collections.json
         """
-        raise NotImplementedError("ShopifyClient.list_collections hələ implement olunmayıb.")
+        raise NotImplementedError(
+            "ShopifyClient.list_collections hələ implement olunmayıb."
+        )
 
     # -----------------------------
     # METAFIELDS
@@ -241,7 +245,9 @@ class ShopifyClient:
 
         Gələcəkdə buraya real implementasiya əlavə olunacaq.
         """
-        raise NotImplementedError("ShopifyClient.create_or_update_metafield hələ implement olunmayıb.")
+        raise NotImplementedError(
+            "ShopifyClient.create_or_update_metafield hələ implement olunmayıb."
+        )
 
     # -----------------------------
     # WEBHOOKS
@@ -253,7 +259,9 @@ class ShopifyClient:
 
         Gələcəkdə buraya real implementasiya əlavə olunacaq.
         """
-        raise NotImplementedError("ShopifyClient.register_webhook hələ implement olunmayıb.")
+        raise NotImplementedError(
+            "ShopifyClient.register_webhook hələ implement olunmayıb."
+        )
 
     # -----------------------------
     # HEALTHCHECK
@@ -269,3 +277,27 @@ class ShopifyClient:
           - yalnız config-in doluluğunu yoxlayırıq.
         """
         return bool(self.config.store_domain and self.config.access_token)
+
+
+# --------------------------------------------------------------------
+# Backwards-compatible helper for older modules
+# Some legacy modules still do:
+#   from app.integrations.shopify_client import _shopify_url
+#
+# To keep the system starting cleanly, we expose a lightweight
+# placeholder here. Real Shopify URL building is handled inside
+# ShopifyClient._build_url.
+def _shopify_url(path: str) -> str:
+    """
+    Minimal path normalizer skeleton.
+
+    Hal-hazırda yalnız başında slash olmayan path-lərə "/" əlavə edir
+    və string qaytarır. Real integration mərhələsində bu helper ya
+    tamamilə ləğv olunacaq, ya da ShopifyClient ilə əvəzlənəcək.
+    """
+    if not path:
+        return "/"
+    path = str(path)
+    if not path.startswith("/"):
+        path = "/" + path
+    return path
