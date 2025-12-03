@@ -1,611 +1,197 @@
-import os
-import json
+"""
+ShopifyClient – Shopify API ilə danışan əsas low-level klient (skeleton).
+
+Məqsəd:
+- Bütün HTTP çağırışlar yalnız bu class vasitəsilə getsin
+- Qalan modullar (orchestrator, mapper, sync service və s.) sadəcə
+  bu interface ilə işləsin, HTTP detalını görməsin
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
-import requests
-
-
-# ==========================================================
-#  BASIC SHOPIFY CONFIG
-# ==========================================================
-
-SHOPIFY_STORE_DOMAIN = os.environ.get("SHOPIFY_STORE_DOMAIN", "").strip()
-SHOPIFY_ADMIN_ACCESS_TOKEN = os.environ.get("SHOPIFY_ADMIN_ACCESS_TOKEN", "").strip()
-SHOPIFY_API_VERSION = os.environ.get("SHOPIFY_API_VERSION", "2024-01").strip()
-
-
-def _ensure_config() -> None:
-    """
-    Ensures Shopify env vars are present.
-
-    Required:
-      - SHOPIFY_STORE_DOMAIN  (e.g. samarkand-soul.myshopify.com)
-      - SHOPIFY_ADMIN_ACCESS_TOKEN  (Admin API access token)
-    """
-    if not SHOPIFY_STORE_DOMAIN or not SHOPIFY_ADMIN_ACCESS_TOKEN:
-        raise RuntimeError(
-            "Shopify config is missing. "
-            "Check SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_ACCESS_TOKEN env vars."
-        )
-
-
-def _shopify_url(path: str) -> str:
-    """Build full Shopify Admin REST URL."""
-    path = path.lstrip("/")
-    return f"https://{SHOPIFY_STORE_DOMAIN}/admin/api/{SHOPIFY_API_VERSION}/{path}"
-
-
-def _shopify_headers() -> dict:
-    return {
-        "X-Shopify-Access-Token": SHOPIFY_ADMIN_ACCESS_TOKEN,
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-    }
-
-
-# ==========================================================
-#  DATA CLASSES
-# ==========================================================
 
 @dataclass
-class ShopifyDemoProductSpec:
-    title: str
-    description: str
-    price: str
-    tags: Optional[List[str]] = None
-    image_url: Optional[str] = None
-
-
-# ==========================================================
-#  HEALTH CHECK  (msp: shopify: test)
-# ==========================================================
-
-def test_shopify_connection() -> str:
+class ShopifyConfig:
     """
-    Simple health-check: GET /shop.json
+    Shopify konfiqurasiya modeli.
 
-    Telegram:
-      msp: shopify: test
+    Nümunə ENV-lər:
+      SHOPIFY_API_KEY
+      SHOPIFY_ACCESS_TOKEN
+      SHOPIFY_STORE_DOMAIN
+      SHOPIFY_API_VERSION
     """
-    try:
-        _ensure_config()
-        url = _shopify_url("shop.json")
-        resp = requests.get(url, headers=_shopify_headers(), timeout=15)
 
-        if resp.status_code != 200:
-            return (
-                "MSP error: Shopify connection FAILED.\n"
-                f"Status: {resp.status_code}\n"
-                f"Body: {resp.text[:500]}"
-            )
-
-        data = resp.json().get("shop", {})
-        name = data.get("name", "(unknown)")
-        domain = data.get("domain", "(unknown)")
-        return (
-            "✅ Shopify connection OK. Admin API is accessible.\n"
-            f"Shop name: {name}\n"
-            f"Domain: {domain}"
-        )
-    except Exception as e:  # pylint: disable=broad-except
-        return f"MSP error: Shopify connection exception: {e}"
+    api_key: str
+    access_token: str
+    store_domain: str  # misal: "my-shop.myshopify.com"
+    api_version: str = "2024-01"
 
 
-# ==========================================================
-#  DEMO PRODUCT  (msp: shopify: demo)
-# ==========================================================
-
-def create_demo_product(spec: ShopifyDemoProductSpec) -> str:
+class ShopifyClient:
     """
-    Create a simple demo product in Shopify.
+    Shopify REST API üçün low-level klient skeleton.
 
-    Telegram:
-      msp: shopify: demo
+    Vacib: Bu mərhələdə heç bir real HTTP çağırışı implement etmirik.
+    Bütün method-lar NotImplementedError atır.
+    Sonrakı mərhələdə bu method-ların içini dolduracağıq.
     """
-    try:
-        _ensure_config()
-
-        payload = {
-            "product": {
-                "title": spec.title,
-                "body_html": spec.description,
-                "status": "active",
-                "published": True,
-                "variants": [
-                    {
-                        "price": spec.price,
-                        "sku": "DEMO-PRODUCT",
-                    }
-                ],
-                "tags": spec.tags or ["samarkand soul", "demo"],
-            }
-        }
-
-        if spec.image_url:
-            payload["product"]["images"] = [{"src": spec.image_url}]
-
-        url = _shopify_url("products.json")
-        resp = requests.post(
-            url, headers=_shopify_headers(), data=json.dumps(payload), timeout=20
-        )
-
-        if resp.status_code not in (200, 201):
-            return (
-                "MSP error: Demo product creation failed.\n"
-                f"Status: {resp.status_code}\n"
-                f"Body: {resp.text[:800]}"
-            )
-
-        product = resp.json().get("product", {})
-        pid = product.get("id")
-        handle = product.get("handle")
-        admin_url = f"/admin/products/{pid}" if pid else "unknown"
-        storefront_url = f"/products/{handle}" if handle else "unknown"
-
-        return (
-            "✅ Demo product created in Shopify.\n"
-            f"ID: {pid}\n"
-            f"Handle: {handle}\n"
-            f"Admin URL: {admin_url}\n"
-            f"Storefront URL (if published later): {storefront_url}"
-        )
-
-    except Exception as e:  # pylint: disable=broad-except
-        return f"MSP error: Demo product exception: {e}"
-
-
-# ==========================================================
-#  COMING SOON PRODUCT  (msp: shopify: comingsoon)
-# ==========================================================
-
-def setup_coming_soon_product() -> str:
-    """
-    Creates or updates a 'Samarkand Soul — Coming Soon' product.
-
-    Telegram:
-      msp: shopify: comingsoon
-    """
-    try:
-        _ensure_config()
-
-        title = "Samarkand Soul — Coming Soon"
-        handle = "samarkand-soul-coming-soon"
-
-        # Try to find existing product by title/handle
-        search_url = _shopify_url("products.json")
-        resp = requests.get(
-            search_url,
-            headers=_shopify_headers(),
-            params={"title": title, "limit": 50},
-            timeout=20,
-        )
-
-        if resp.status_code not in (200, 201):
-            existing_product = None
-        else:
-            items = resp.json().get("products", [])
-            existing_product = None
-            for p in items:
-                if p.get("handle") == handle or p.get("title") == title:
-                    existing_product = p
-                    break
-
-        body_html = """
-<p><strong>Samarkand Soul is coming soon.</strong></p>
-<p>We are weaving the soul of Samarkand into modern home textiles:
-premium tablecloths, minimalist design, deep storytelling.</p>
-<p>Leave your email on the homepage to be the first to know when we launch.</p>
-"""
-
-        product_data = {
-            "title": title,
-            "body_html": body_html,
-            "handle": handle,
-            "status": "active",
-            "published": True,
-            "tags": ["coming-soon", "samarkand soul", "launch"],
-            "variants": [
-                {
-                    "price": "0.00",
-                    "sku": "COMING-SOON",
-                }
-            ],
-        }
-
-        # Update existing
-        if existing_product:
-            pid = existing_product.get("id")
-            update_url = _shopify_url(f"products/{pid}.json")
-            payload = {"product": {"id": pid, **product_data}}
-            resp2 = requests.put(
-                update_url,
-                headers=_shopify_headers(),
-                data=json.dumps(payload),
-                timeout=20,
-            )
-
-            if resp2.status_code not in (200, 201):
-                return (
-                    "MSP error: Coming Soon product UPDATE failed.\n"
-                    f"Status: {resp2.status_code}\n"
-                    f"Body: {resp2.text[:800]}"
-                )
-
-            product = resp2.json().get("product", {})
-            action = "updated"
-        else:
-            create_url = _shopify_url("products.json")
-            payload = {"product": product_data}
-            resp2 = requests.post(
-                create_url,
-                headers=_shopify_headers(),
-                data=json.dumps(payload),
-                timeout=20,
-            )
-
-            if resp2.status_code not in (200, 201):
-                return (
-                    "MSP error: Coming Soon product CREATION failed.\n"
-                    f"Status: {resp2.status_code}\n"
-                    f"Body: {resp2.text[:800]}"
-                )
-
-            product = resp2.json().get("product", {})
-            action = "created"
-
-        pid = product.get("id")
-        handle = product.get("handle", handle)
-        admin_url = f"/admin/products/{pid}" if pid else "unknown"
-        storefront_url = f"/products/{handle}" if handle else "unknown"
-
-        return (
-            f"✅ Coming Soon product {action} in Shopify.\n"
-            f"ID: {pid}\n"
-            f"Handle: {handle}\n"
-            f"Admin URL: {admin_url}\n"
-            f"Storefront URL: {storefront_url}"
-        )
-
-    except Exception as e:  # pylint: disable=broad-except
-        return f"MSP error: setup_coming_soon_product exception: {e}"
-
-
-# ==========================================================
-#  PRODUCT FROM PROMPT  (msp: shopify: add | ...)
-# ==========================================================
-
-def create_product_from_prompt(raw_prompt: str) -> str:
-    """
-    Parse 'Title | Price | OptionalImageURL' and create a simple product.
-
-    IMPORTANT:
-      • Products are created as DRAFT with tag 'NEEDS_APPROVAL'.
-      • They are NOT published to Online Store automatically.
-    """
-    try:
-        _ensure_config()
-
-        parts = [p.strip() for p in raw_prompt.split("|")]
-        if len(parts) < 2:
-            return (
-                "MSP error: Invalid format for 'shopify: add'.\n"
-                "Use: msp: shopify: add | Title | Price | OptionalImageURL"
-            )
-
-        title = parts[0]
-        price = parts[1]
-        image_url = parts[2] if len(parts) > 2 and parts[2] else None
-
-        payload = {
-            "product": {
-                "title": title,
-                "body_html": f"<p>{title}</p>",
-                # Agent-created products must be manually approved by Zahid.
-                "status": "draft",
-                "published": False,
-                "variants": [{"price": price}],
-                "tags": ["samarkand soul", "ds-auto", "NEEDS_APPROVAL"],
-            }
-        }
-
-        if image_url:
-            payload["product"]["images"] = [{"src": image_url}]
-
-        url = _shopify_url("products.json")
-        resp = requests.post(
-            url, headers=_shopify_headers(), data=json.dumps(payload), timeout=20
-        )
-
-        if resp.status_code not in (200, 201):
-            return (
-                "MSP error: Product creation failed.\n"
-                f"Status: {resp.status_code}\n"
-                f"Body: {resp.text[:800]}"
-            )
-
-        product = resp.json().get("product", {})
-        pid = product.get("id")
-        handle = product.get("handle")
-        admin_url = f"/admin/products/{pid}" if pid else "unknown"
-        storefront_url = f"/products/{handle}" if handle else "unknown"
-
-        return (
-            "✅ Product CREATED as DRAFT in Shopify.\n"
-            "Status: draft (NEEDS_MANUAL_APPROVAL)\n"
-            f"Title: {title}\n"
-            f"Price: {price}\n"
-            f"ID: {pid}\n"
-            f"Admin URL: {admin_url}\n"
-            f"Storefront URL (after publish): {storefront_url}"
-        )
-
-    except Exception as e:  # pylint: disable=broad-except
-        return f"MSP error: create_product_from_prompt exception: {e}"
-
-
-# ==========================================================
-#  COLLECTION  (msp: shopify: collection | Name)
-# ==========================================================
-
-def create_collection(name: str) -> str:
-    """
-    Creates a manual collection.
-
-    Telegram:
-      msp: shopify: collection | Samarkand Soul Tablecloths
-    """
-    try:
-        _ensure_config()
-
-        payload = {
-            "custom_collection": {
-                "title": name,
-                "published": True,
-            }
-        }
-
-        url = _shopify_url("custom_collections.json")
-        resp = requests.post(
-            url, headers=_shopify_headers(), data=json.dumps(payload), timeout=20
-        )
-
-        if resp.status_code not in (200, 201):
-            return (
-                "MSP error: Collection creation failed.\n"
-                f"Status: {resp.status_code}\n"
-                f"Body: {resp.text[:800]}"
-            )
-
-        coll = resp.json().get("custom_collection", {})
-        cid = coll.get("id")
-        handle = coll.get("handle")
-
-        return (
-            "✅ Collection created in Shopify.\n"
-            f"Name: {name}\n"
-            f"ID: {cid}\n"
-            f"Handle: {handle}"
-        )
-
-    except Exception as e:  # pylint: disable=broad-except
-        return f"MSP error: create_collection exception: {e}"
-
-
-# ==========================================================
-#  BASIC STORE STRUCTURE  (msp: shopify: structure_basic)
-# ==========================================================
-
-def _create_or_update_page(title: str, handle: str, body_html: str) -> str:
-    """
-    Internal helper to create or update a Shopify Page by handle.
-    """
-    url_list = _shopify_url("pages.json")
-    resp = requests.get(
-        url_list,
-        headers=_shopify_headers(),
-        params={"limit": 250},
-        timeout=20,
-    )
-
-    if resp.status_code not in (200, 201):
-        raise RuntimeError(
-            f"Page list failed: {resp.status_code} {resp.text[:400]}"
-        )
-
-    pages = resp.json().get("pages", [])
-    existing = next((p for p in pages if p.get("handle") == handle), None)
-
-    if existing:
-        page_id = existing["id"]
-        update_url = _shopify_url(f"pages/{page_id}.json")
-        payload = {"page": {"id": page_id, "title": title, "body_html": body_html}}
-        resp2 = requests.put(
-            update_url,
-            headers=_shopify_headers(),
-            data=json.dumps(payload),
-            timeout=20,
-        )
-        if resp2.status_code not in (200, 201):
-            raise RuntimeError(
-                f"Page update failed: {resp2.status_code} {resp2.text[:400]}"
-            )
-        return f"updated: {handle}"
-    else:
-        create_url = _shopify_url("pages.json")
-        payload = {
-            "page": {
-                "title": title,
-                "handle": handle,
-                "body_html": body_html,
-                "published": True,
-            }
-        }
-        resp2 = requests.post(
-            create_url,
-            headers=_shopify_headers(),
-            data=json.dumps(payload),
-            timeout=20,
-        )
-        if resp2.status_code not in (200, 201):
-            raise RuntimeError(
-                f"Page create failed: {resp2.status_code} {resp2.text[:400]}"
-            )
-        return f"created: {handle}"
-
-
-def setup_basic_store_structure() -> str:
-    """
-    Creates/updates core pages for Samarkand Soul brand.
-
-    Telegram:
-      msp: shopify: structure_basic
-
-    Daxildə:
-      - About Samarkand Soul
-      - Shipping & Returns
-      - Privacy Policy
-      - Terms of Service
-      - Contact
-    """
-    try:
-        _ensure_config()
-
-        changes: List[str] = []
-
-        about_body = """
-<h2>About Samarkand Soul</h2>
-<p>Samarkand Soul weaves the soul of history into modern home rituals.
-Premium tablecloths, calm luxury aesthetics and honest storytelling.</p>
-"""
-        changes.append(
-            _create_or_update_page(
-                title="About Samarkand Soul",
-                handle="about-samarkand-soul",
-                body_html=about_body,
-            )
-        )
-
-        shipping_body = """
-<h2>Shipping & Returns</h2>
-<p>We ship worldwide from our trusted partners. Standard processing time
-is 2–5 business days. For detailed shipping zones and return rules,
-please see the policy on this page or contact our support.</p>
-"""
-        changes.append(
-            _create_or_update_page(
-                title="Shipping & Returns",
-                handle="shipping-and-returns",
-                body_html=shipping_body,
-            )
-        )
-
-        privacy_body = """
-<h2>Privacy Policy</h2>
-<p>We respect your privacy. We only use your data to process orders and
-improve your experience. We never sell personal data to third parties.</p>
-"""
-        changes.append(
-            _create_or_update_page(
-                title="Privacy Policy",
-                handle="privacy-policy",
-                body_html=privacy_body,
-            )
-        )
-
-        terms_body = """
-<h2>Terms of Service</h2>
-<p>By using our store, you agree to our terms of service. Please review
-this page for details about orders, payments and limitations.</p>
-"""
-        changes.append(
-            _create_or_update_page(
-                title="Terms of Service",
-                handle="terms-of-service",
-                body_html=terms_body,
-            )
-        )
-
-        contact_body = """
-<h2>Contact</h2>
-<p>If you have any questions about Samarkand Soul, your order or our
-products, you can reach us via email or the contact form on this page.</p>
-"""
-        changes.append(
-            _create_or_update_page(
-                title="Contact",
-                handle="contact",
-                body_html=contact_body,
-            )
-        )
-
-        return (
-            "✅ Basic Samarkand Soul store structure created/updated.\n"
-            "Pages:\n- " + "\n- ".join(changes)
-        )
-
-    except Exception as e:  # pylint: disable=broad-except
-        return f"MSP error: setup_basic_store_structure exception: {e}"
-
-
-# ==========================================================
-#  AUTODS STUBS (FUTURE INTEGRATION)
-# ==========================================================
-
-def autods_search_stub(niche: str) -> str:
-    """
-    Placeholder for AutoDS product search.
-    """
-    return (
-        "[ESCALATION]\n"
-        "Reason: AutoDS API is not integrated yet.\n"
-        "Action: Configure AutoDS API (endpoint + token) in backend.\n"
-        "Summary: Once AutoDS API is available, MSP can auto-search products "
-        f"for niche: {niche}"
-    )
-
-
-# ==========================================================
-#  SINGLE PAGE UPDATE (used by: msp: shopify: update_page | handle | BODY_HTML)
-# ==========================================================
-
-_PAGE_TITLE_MAP = {
-    "privacy-policy": "Privacy Policy",
-    "terms-of-service": "Terms of Service",
-    "shipping-and-returns": "Shipping & Returns",
-    "about-samarkand-soul": "About Samarkand Soul",
-    "contact": "Contact",
-}
-
-
-def overwrite_page_html(handle: str, body_html: str, title: Optional[str] = None) -> str:
-    """
-    Overwrite or create a single Shopify Page by handle.
-
-    Used by MSP bridge:
-      msp: shopify: update_page | privacy-policy | <HTML or generated text>
-
-    MSP tərəfi GPT ilə HTML generasiya edib bura ötürür.
-    """
-    try:
-        _ensure_config()
-        h = (handle or "").strip().lower()
-        if not h:
-            return "MSP error: overwrite_page_html: handle is empty."
-
-        page_title = title or _PAGE_TITLE_MAP.get(h) or h.replace("-", " ").title()
-
-        result = _create_or_update_page(
-            title=page_title,
-            handle=h,
-            body_html=body_html,
-        )
-
-        return (
-            "✅ Page updated in Shopify.\n"
-            f"Handle: {h}\n"
-            f"Title: {page_title}\n"
-            f"Result: {result}"
-        )
-    except Exception as e:  # pylint: disable=broad-except
-        return f"MSP error: overwrite_page_html exception: {e}"
+
+    def __init__(self, config: ShopifyConfig) -> None:
+        self.config = config
+
+    # -----------------------------
+    # Daxili köməkçi util-lər
+    # -----------------------------
+
+    def _build_url(self, path: str) -> str:
+        """
+        API üçün baza URL generatoru.
+        Misal:
+          path="/products.json" ->
+          "https://{store_domain}/admin/api/{version}/products.json"
+        """
+        base = f"https://{self.config.store_domain}/admin/api/{self.config.api_version}"
+        if not path.startswith("/"):
+            path = "/" + path
+        return base + path
+
+    # -----------------------------
+    # PRODUCTS
+    # -----------------------------
+
+    def list_products(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Shopify product siyahısını çəkir.
+
+        Gözlənilən struktur (sadələşdirilmiş):
+          [
+            {
+              "id": ...,
+              "title": "...",
+              "body_html": "...",
+              "handle": "...",
+              "tags": "tag1, tag2",
+              "images": [...],
+              "variants": [...],
+              ...
+            },
+            ...
+          ]
+        """
+        raise NotImplementedError("ShopifyClient.list_products hələ implement olunmayıb.")
+
+    def get_product(self, product_id: int) -> Dict[str, Any]:
+        """
+        Tək bir product-u id ilə çəkir.
+        """
+        raise NotImplementedError("ShopifyClient.get_product hələ implement olunmayıb.")
+
+    def create_product(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Yeni product yaradılması üçün POST /products.json
+
+        Gözlənən payload:
+          {"product": {...}}
+        """
+        raise NotImplementedError("ShopifyClient.create_product hələ implement olunmayıb.")
+
+    def update_product(self, product_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Mövcud product-un yenilənməsi üçün PUT /products/{id}.json
+        """
+        raise NotImplementedError("ShopifyClient.update_product hələ implement olunmayıb.")
+
+    # -----------------------------
+    # ORDERS
+    # -----------------------------
+
+    def list_orders(self, limit: int = 50, status: str = "any") -> List[Dict[str, Any]]:
+        """
+        Sifariş siyahısını çəkir.
+
+        status:
+          - "open"
+          - "closed"
+          - "cancelled"
+          - "any" (default)
+        """
+        raise NotImplementedError("ShopifyClient.list_orders hələ implement olunmayıb.")
+
+    def get_order(self, order_id: int) -> Dict[str, Any]:
+        """
+        Tək bir sifarişi id ilə çəkir.
+        """
+        raise NotImplementedError("ShopifyClient.get_order hələ implement olunmayıb.")
+
+    # -----------------------------
+    # INVENTORY
+    # -----------------------------
+
+    def update_inventory_bulk(self, stock_map: Dict[str, int]) -> Dict[str, Any]:
+        """
+        SKU → quantity xəritəsini götürüb stokları yeniləyən bulk update skeleton.
+
+        Gələcəkdə:
+          - SKU → inventory_item_id xəritəsi
+          - inventory_levels API çağırışları
+        """
+        raise NotImplementedError("ShopifyClient.update_inventory_bulk hələ implement olunmayıb.")
+
+    # -----------------------------
+    # COLLECTIONS
+    # -----------------------------
+
+    def list_collections(self) -> List[Dict[str, Any]]:
+        """
+        Kolleksiya siyahısını çəkən skeleton method.
+        """
+        raise NotImplementedError("ShopifyClient.list_collections hələ implement olunmayıb.")
+
+    # -----------------------------
+    # METAFIELDS
+    # -----------------------------
+
+    def create_or_update_metafield(
+        self,
+        owner_resource: str,
+        owner_id: int,
+        namespace: str,
+        key: str,
+        value: str,
+        value_type: str = "single_line_text_field",
+    ) -> Dict[str, Any]:
+        """
+        Metafield yaratmaq / yeniləmək üçün skeleton.
+
+        Gələcəkdə metafield_manager bu method-dan istifadə edəcək.
+        """
+        raise NotImplementedError("ShopifyClient.create_or_update_metafield hələ implement olunmayıb.")
+
+    # -----------------------------
+    # WEBHOOKS
+    # -----------------------------
+
+    def register_webhook(self, topic: str, callback_url: str) -> Dict[str, Any]:
+        """
+        Shopify webhook-larını qeydiyyatdan keçirmək üçün skeleton.
+        """
+        raise NotImplementedError("ShopifyClient.register_webhook hələ implement olunmayıb.")
+
+    # -----------------------------
+    # HEALTHCHECK
+    # -----------------------------
+
+    def health_check(self) -> bool:
+        """
+        Sadə healthcheck.
+
+        Real versiyada:
+          - kiçik bir /shop.json və ya /products?limit=1 sorğusu atmaq olar
+        Skeleton versiyada:
+          - sadəcə konfiqın mövcudluğunu yoxlayırıq
+        """
+        return bool(self.config.store_domain and self.config.access_token)
