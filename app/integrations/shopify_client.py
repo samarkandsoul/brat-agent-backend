@@ -1,10 +1,15 @@
 """
-ShopifyClient – Shopify API ilə danışan əsas low-level klient (skeleton).
+ShopifyClient – Shopify API ilə danışan əsas low-level klient.
 
-Məqsəd:
-- Bütün HTTP çağırışlar yalnız bu class vasitəsilə getsin
-- Qalan modullar (orchestrator, mapper, sync service və s.) sadəcə
-  bu interface ilə işləsin, HTTP detalını görməsin
+Bu versiya:
+- Əsas məhsul və sifariş əməliyyatlarını real HTTP ilə edir:
+    - list_products
+    - get_product
+    - create_product
+    - update_product
+    - list_orders
+    - get_order
+- Qalan method-lar hələ NotImplementedError olaraq qalır
 """
 
 from __future__ import annotations
@@ -12,13 +17,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
+import requests
+
 
 @dataclass
 class ShopifyConfig:
     """
     Shopify konfiqurasiya modeli.
 
-    Nümunə ENV-lər:
+    Adətən bu dəyərlər ENV-dən gələcək:
+
       SHOPIFY_API_KEY
       SHOPIFY_ACCESS_TOKEN
       SHOPIFY_STORE_DOMAIN
@@ -33,11 +41,11 @@ class ShopifyConfig:
 
 class ShopifyClient:
     """
-    Shopify REST API üçün low-level klient skeleton.
+    Shopify REST API üçün low-level klient.
 
-    Vacib: Bu mərhələdə heç bir real HTTP çağırışı implement etmirik.
-    Bütün method-lar NotImplementedError atır.
-    Sonrakı mərhələdə bu method-ların içini dolduracağıq.
+    Qaydalar:
+      - Bütün HTTP çağırışlar yalnız BU class-dan keçməlidir
+      - Qalan modullar (orchestrator, mapper, sync service və s.) HTTP detalını görməməlidir
     """
 
     def __init__(self, config: ShopifyConfig) -> None:
@@ -59,6 +67,40 @@ class ShopifyClient:
             path = "/" + path
         return base + path
 
+    def _headers(self) -> Dict[str, str]:
+        """
+        Shopify üçün standart header-lər.
+        """
+        return {
+            "X-Shopify-Access-Token": self.config.access_token,
+            "Content-Type": "application/json",
+        }
+
+    def _request(
+        self,
+        method: str,
+        path: str,
+        params: Optional[Dict[str, Any]] = None,
+        json: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Internal HTTP helper.
+
+        Səhv olarsa Exception atır – yüksək səviyyədə GlobalErrorHandler tutacaq.
+        """
+        url = self._build_url(path)
+        resp = requests.request(
+            method=method.upper(),
+            url=url,
+            headers=self._headers(),
+            params=params,
+            json=json,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data
+
     # -----------------------------
     # PRODUCTS
     # -----------------------------
@@ -67,43 +109,57 @@ class ShopifyClient:
         """
         Shopify product siyahısını çəkir.
 
-        Gözlənilən struktur (sadələşdirilmiş):
-          [
-            {
-              "id": ...,
-              "title": "...",
-              "body_html": "...",
-              "handle": "...",
-              "tags": "tag1, tag2",
-              "images": [...],
-              "variants": [...],
-              ...
-            },
-            ...
-          ]
+        Endpoint:
+          GET /products.json?limit={limit}
         """
-        raise NotImplementedError("ShopifyClient.list_products hələ implement olunmayıb.")
+        data = self._request(
+            method="GET",
+            path="/products.json",
+            params={"limit": limit},
+        )
+        # Shopify product-ları "products" açarında qaytarır
+        return data.get("products", [])
 
     def get_product(self, product_id: int) -> Dict[str, Any]:
         """
         Tək bir product-u id ilə çəkir.
+
+        Endpoint:
+          GET /products/{id}.json
         """
-        raise NotImplementedError("ShopifyClient.get_product hələ implement olunmayıb.")
+        data = self._request(
+            method="GET",
+            path=f"/products/{product_id}.json",
+        )
+        return data.get("product", {})
 
     def create_product(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Yeni product yaradılması üçün POST /products.json
+        Yeni product yaradılması üçün:
 
-        Gözlənən payload:
-          {"product": {...}}
+          POST /products.json
+          Body: {"product": {...}}
         """
-        raise NotImplementedError("ShopifyClient.create_product hələ implement olunmayıb.")
+        data = self._request(
+            method="POST",
+            path="/products.json",
+            json=payload,
+        )
+        return data.get("product", {})
 
     def update_product(self, product_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Mövcud product-un yenilənməsi üçün PUT /products/{id}.json
+        Mövcud product-un yenilənməsi üçün:
+
+          PUT /products/{id}.json
+          Body: {"product": {...}}
         """
-        raise NotImplementedError("ShopifyClient.update_product hələ implement olunmayıb.")
+        data = self._request(
+            method="PUT",
+            path=f"/products/{product_id}.json",
+            json=payload,
+        )
+        return data.get("product", {})
 
     # -----------------------------
     # ORDERS
@@ -113,19 +169,28 @@ class ShopifyClient:
         """
         Sifariş siyahısını çəkir.
 
-        status:
-          - "open"
-          - "closed"
-          - "cancelled"
-          - "any" (default)
+        Endpoint:
+          GET /orders.json?limit={limit}&status={status}
         """
-        raise NotImplementedError("ShopifyClient.list_orders hələ implement olunmayıb.")
+        data = self._request(
+            method="GET",
+            path="/orders.json",
+            params={"limit": limit, "status": status},
+        )
+        return data.get("orders", [])
 
     def get_order(self, order_id: int) -> Dict[str, Any]:
         """
         Tək bir sifarişi id ilə çəkir.
+
+        Endpoint:
+          GET /orders/{id}.json
         """
-        raise NotImplementedError("ShopifyClient.get_order hələ implement olunmayıb.")
+        data = self._request(
+            method="GET",
+            path=f"/orders/{order_id}.json",
+        )
+        return data.get("order", {})
 
     # -----------------------------
     # INVENTORY
@@ -135,9 +200,13 @@ class ShopifyClient:
         """
         SKU → quantity xəritəsini götürüb stokları yeniləyən bulk update skeleton.
 
+        Diqqət:
+          Shopify inventory API kifayət qədər kompleksdir (inventory_item_id, location_id və s.).
+          Bu mərhələdə yalnız skeleton saxlayırıq.
+
         Gələcəkdə:
-          - SKU → inventory_item_id xəritəsi
-          - inventory_levels API çağırışları
+          - SKU → inventory_item_id map-i qurulacaq
+          - /inventory_levels/adjust.json və s. endpoint-lərdən istifadə ediləcək.
         """
         raise NotImplementedError("ShopifyClient.update_inventory_bulk hələ implement olunmayıb.")
 
@@ -148,6 +217,9 @@ class ShopifyClient:
     def list_collections(self) -> List[Dict[str, Any]]:
         """
         Kolleksiya siyahısını çəkən skeleton method.
+
+        Gələcək implementasiya:
+          GET /custom_collections.json və ya /smart_collections.json
         """
         raise NotImplementedError("ShopifyClient.list_collections hələ implement olunmayıb.")
 
@@ -167,7 +239,7 @@ class ShopifyClient:
         """
         Metafield yaratmaq / yeniləmək üçün skeleton.
 
-        Gələcəkdə metafield_manager bu method-dan istifadə edəcək.
+        Gələcəkdə buraya real implementasiya əlavə olunacaq.
         """
         raise NotImplementedError("ShopifyClient.create_or_update_metafield hələ implement olunmayıb.")
 
@@ -178,6 +250,8 @@ class ShopifyClient:
     def register_webhook(self, topic: str, callback_url: str) -> Dict[str, Any]:
         """
         Shopify webhook-larını qeydiyyatdan keçirmək üçün skeleton.
+
+        Gələcəkdə buraya real implementasiya əlavə olunacaq.
         """
         raise NotImplementedError("ShopifyClient.register_webhook hələ implement olunmayıb.")
 
@@ -190,8 +264,8 @@ class ShopifyClient:
         Sadə healthcheck.
 
         Real versiyada:
-          - kiçik bir /shop.json və ya /products?limit=1 sorğusu atmaq olar
+          - kiçik bir sorğu ilə API-ni yoxlamaq olar.
         Skeleton versiyada:
-          - sadəcə konfiqın mövcudluğunu yoxlayırıq
+          - yalnız config-in doluluğunu yoxlayırıq.
         """
         return bool(self.config.store_domain and self.config.access_token)
